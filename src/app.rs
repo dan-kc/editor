@@ -4,11 +4,26 @@ use crate::buffer::{self, Buffer};
 
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
+#[derive(Debug,Clone,Copy)]
+pub enum Mode {
+    Normal,
+    Insert,
+}
+
+impl Mode {
+    pub fn get_text(self) -> String {
+        match self {
+            Mode::Normal => String::from("Normal"),
+            Mode::Insert => String::from("Insert"),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct App {
-    /// Is the application running?
     pub running: bool,
     pub buffer: Buffer,
+    pub mode: Mode,
     pub counter: u8,
     cursor: (u8, u8),
 }
@@ -17,9 +32,10 @@ impl Default for App {
     fn default() -> Self {
         Self {
             buffer: Buffer::default(),
+            mode: Mode::Normal,
             running: true,
             counter: 0,
-            cursor: (0,0),
+            cursor: (0, 0),
         }
     }
 }
@@ -29,9 +45,10 @@ impl App {
     pub fn new(buffer: buffer::Buffer) -> Self {
         Self {
             buffer,
+            mode: Mode::Normal,
             running: true,
             counter: 0,
-            cursor: (0,0),
+            cursor: (0, 0),
         }
     }
 

@@ -1,5 +1,5 @@
 use ratatui::{
-    layout::Alignment,
+    layout::{Alignment, Constraint, Layout},
     style::{Color, Style},
     text::Line,
     widgets::{Block, BorderType, Paragraph},
@@ -8,15 +8,27 @@ use ratatui::{
 
 use crate::app::App;
 
-use self::widgets::TextArea;
+use self::widgets::{StatusLine, TextArea};
 mod widgets;
 
 /// Renders the widgets.
 pub fn render(app: &mut App, frame: &mut Frame) {
-    frame.render_widget(
-        TextArea::new(&app.buffer),
-        frame.size(),
-    );
+    let layout = Layout::default()
+        .direction(ratatui::layout::Direction::Vertical)
+        .constraints([Constraint::Fill(1), Constraint::Length(1)])
+        .split(frame.size());
+
+    frame.render_widget(TextArea::new(&app.buffer), layout[0]);
+    frame.render_widget(StatusLine::new(&app.mode), layout[1]);
+        //     .block(
+    //         Block::bordered()
+    //             .title("Template")
+    //             .title_alignment(Alignment::Center)
+    //             .border_type(BorderType::Rounded),
+    //     )
+    //     .style(Style::default().fg(Color::Cyan))
+    //     .centered(),
+
     // frame.render_widget(
     //     Paragraph::new(format!(
     //         "This is a tui template.\n\
