@@ -4,7 +4,7 @@ use crate::buffer::{self, Buffer};
 
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
-#[derive(Debug,Clone,Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum Mode {
     Normal,
     Insert,
@@ -25,7 +25,7 @@ pub struct App {
     pub buffer: Buffer,
     pub mode: Mode,
     pub counter: u8,
-    cursor: (u8, u8),
+    pub cursor: (u8, u8),
 }
 
 impl Default for App {
@@ -58,6 +58,22 @@ impl App {
     /// Set running to false to quit the application.
     pub fn quit(&mut self) {
         self.running = false;
+    }
+
+    pub fn get_scroll_pos(&self) -> &u8 {
+        &self.cursor.1
+    }
+
+    pub fn move_up(&mut self) {
+        if let Some(res) = self.cursor.1.checked_sub(1) {
+            self.cursor.1=res;
+        }
+    }
+
+    pub fn move_down(&mut self) {
+        if let Some(res) = self.cursor.1.checked_add(1) {
+            self.cursor.1=res;
+        }
     }
 
     pub fn increment_counter(&mut self) {

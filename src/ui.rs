@@ -12,15 +12,15 @@ use self::widgets::{StatusLine, TextArea};
 mod widgets;
 
 /// Renders the widgets.
-pub fn render(app: &mut App, frame: &mut Frame) {
+pub fn render(app: &App, frame: &mut Frame) {
     let layout = Layout::default()
         .direction(ratatui::layout::Direction::Vertical)
         .constraints([Constraint::Fill(1), Constraint::Length(1)])
         .split(frame.size());
 
-    frame.render_widget(TextArea::new(&app.buffer), layout[0]);
+    frame.render_widget(TextArea::new(app), layout[0]);
     frame.render_widget(StatusLine::new(&app.mode), layout[1]);
-        //     .block(
+    //     .block(
     //         Block::bordered()
     //             .title("Template")
     //             .title_alignment(Alignment::Center)

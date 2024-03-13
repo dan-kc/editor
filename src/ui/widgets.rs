@@ -5,25 +5,32 @@ use ratatui::{
     text::Line,
     widgets::{Block, Borders, Widget},
 };
+use ropey::Rope;
 
 use crate::app::Mode;
 
 pub struct TextArea<'a> {
-    buffer: &'a crate::buffer::Buffer,
+    text: &'a Rope,
+    scroll_pos: &'a u8,
 }
 
 impl<'a> TextArea<'a> {
-    pub fn new(buffer: &'a crate::buffer::Buffer) -> Self {
-        TextArea { buffer }
+    pub fn new(app: &'a crate::app::App) -> Self {
+        TextArea {
+            text: &app.buffer.text,
+            scroll_pos: app.get_scroll_pos(),
+        }
     }
 }
 
 impl<'a> Widget for TextArea<'a> {
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
-        let text = &self.buffer.text;
-        for (index, line) in text.lines().enumerate() {
+        let scroll_pos = self.scroll_pos;
+        let text = &self.text;
+        for i in 0..buf.area.height - 1 {
+            let line = text.line((*scroll_pos + i as u8) as usize);
             let ratatui_line = Line::raw(line);
-            _ = buf.set_line(0, index as u16, &ratatui_line, area.width)
+            _ = buf.set_line(0, i, &ratatui_line, area.width)
         }
     }
 }

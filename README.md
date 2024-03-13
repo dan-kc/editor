@@ -1,6 +1,4 @@
-## Simple Async template
-
-This simple async template will create the following project structure:
+# Editor
 
 ```text
 src/
@@ -12,3 +10,7 @@ src/
 ├── tui.rs     -> initializes/exits the terminal interface
 └── ui.rs      -> renders the widgets / UI
 ```
+
+## TODO:
+
+- Fix out of bounds panic for scrolling to far

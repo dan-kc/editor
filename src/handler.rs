@@ -18,6 +18,12 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
         KeyCode::Right => {
             app.increment_counter();
         }
+        KeyCode::Up => {
+            app.move_up();
+        }
+        KeyCode::Down => {
+            app.move_down();
+        }
         KeyCode::Left => {
             app.decrement_counter();
         }
