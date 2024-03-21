@@ -24,7 +24,6 @@ pub struct App {
     pub running: bool,
     pub buffer: Buffer,
     pub mode: Mode,
-    pub counter: u8,
     pub cursor: (u8, u8),
 }
 
@@ -34,7 +33,6 @@ impl Default for App {
             buffer: Buffer::default(),
             mode: Mode::Normal,
             running: true,
-            counter: 0,
             cursor: (0, 0),
         }
     }
@@ -47,15 +45,12 @@ impl App {
             buffer,
             mode: Mode::Normal,
             running: true,
-            counter: 0,
             cursor: (0, 0),
         }
     }
 
-    /// Handles the tick event of the terminal.
     pub fn tick(&self) {}
 
-    /// Set running to false to quit the application.
     pub fn quit(&mut self) {
         self.running = false;
     }
@@ -66,25 +61,17 @@ impl App {
 
     pub fn move_up(&mut self) {
         if let Some(res) = self.cursor.1.checked_sub(1) {
-            self.cursor.1=res;
+            self.cursor.1 = res;
         }
     }
 
     pub fn move_down(&mut self) {
+        // TODO: Prevent scrolling further than text buffer
+        // if *self.get_scroll_pos() as usize >= self.buffer.text.len_lines() - 1 {
+        //     panic!("YOU SCrolled too far m8")
+        // }
         if let Some(res) = self.cursor.1.checked_add(1) {
-            self.cursor.1=res;
-        }
-    }
-
-    pub fn increment_counter(&mut self) {
-        if let Some(res) = self.counter.checked_add(1) {
-            self.counter = res;
-        }
-    }
-
-    pub fn decrement_counter(&mut self) {
-        if let Some(res) = self.counter.checked_sub(1) {
-            self.counter = res;
+            self.cursor.1 = res;
         }
     }
 }

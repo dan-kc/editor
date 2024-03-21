@@ -1,50 +1,31 @@
 use ratatui::{
-    layout::{Alignment, Constraint, Layout},
-    style::{Color, Style},
-    text::Line,
-    widgets::{Block, BorderType, Paragraph},
+    layout::{Constraint, Layout},
     Frame,
 };
 
 use crate::app::App;
 
-use self::widgets::{StatusLine, TextArea};
+use self::widgets::{CursorLine, StatusLine, UpperTextArea};
+
 mod widgets;
 
-/// Renders the widgets.
 pub fn render(app: &App, frame: &mut Frame) {
-    let layout = Layout::default()
+    let status_line_layout = Layout::default()
         .direction(ratatui::layout::Direction::Vertical)
         .constraints([Constraint::Fill(1), Constraint::Length(1)])
         .split(frame.size());
 
-    frame.render_widget(TextArea::new(app), layout[0]);
-    frame.render_widget(StatusLine::new(&app.mode), layout[1]);
-    //     .block(
-    //         Block::bordered()
-    //             .title("Template")
-    //             .title_alignment(Alignment::Center)
-    //             .border_type(BorderType::Rounded),
-    //     )
-    //     .style(Style::default().fg(Color::Cyan))
-    //     .centered(),
+    let upper_lower_layout = Layout::default()
+        .direction(ratatui::layout::Direction::Vertical)
+        .constraints(vec![
+            Constraint::Fill(1),
+            Constraint::Length(1),
+            Constraint::Fill(1),
+        ])
+        .split(status_line_layout[0]);
 
-    // frame.render_widget(
-    //     Paragraph::new(format!(
-    //         "This is a tui template.\n\
-    //             Press `Esc`, `Ctrl-C` or `q` to stop running.\n\
-    //             Press left and right to increment and decrement the counter respectively.\n\
-    //             Counter: {}",
-    //         app.counter
-    //     ))
-    //     .block(
-    //         Block::bordered()
-    //             .title("Template")
-    //             .title_alignment(Alignment::Center)
-    //             .border_type(BorderType::Rounded),
-    //     )
-    //     .style(Style::default().fg(Color::Cyan))
-    //     .centered(),
-    //     frame.size(),
-    // );
+    frame.render_widget(StatusLine::new(&app.mode), status_line_layout[1]);
+    frame.render_widget(UpperTextArea::new(app), upper_lower_layout[0]);
+    #[rustfmt::skip]
+    frame.render_widget(CursorLine::new(&app.buffer.text, app.get_scroll_pos()), upper_lower_layout[1]);
 }
