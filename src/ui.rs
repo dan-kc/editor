@@ -5,7 +5,7 @@ use ratatui::{
 
 use crate::app::App;
 
-use self::widgets::{CursorLine, StatusLine, UpperTextArea};
+use self::widgets::{CursorLine, LowerTextArea, StatusLine, UpperTextArea};
 
 mod widgets;
 
@@ -28,4 +28,5 @@ pub fn render(app: &App, frame: &mut Frame) {
     frame.render_widget(UpperTextArea::new(app), upper_lower_layout[0]);
     #[rustfmt::skip]
     frame.render_widget(CursorLine::new(&app.buffer.text, app.get_scroll_pos()), upper_lower_layout[1]);
+    frame.render_widget(LowerTextArea::new(app), upper_lower_layout[2]);
 }

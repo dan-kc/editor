@@ -1,3 +1,5 @@
+use std::usize;
+
 use crate::app::Mode;
 use ratatui::{
     layout::Rect,
@@ -31,7 +33,7 @@ impl<'a> Widget for UpperTextArea<'a> {
         };
         // Mock of top git info window
         for i in 0..top_info_line_count {
-            let ratatui_line = Line::raw("------------");
+            let ratatui_line = Line::raw("----MOCK----");
             _ = buf.set_line(0, i, &ratatui_line, area.width)
         }
 
@@ -45,6 +47,49 @@ impl<'a> Widget for UpperTextArea<'a> {
             let line = self.text.line(line_number); // panics
             let ratatui_line = Line::raw(line);
             _ = buf.set_line(0, i + top_info_line_count, &ratatui_line, area.width)
+        }
+    }
+}
+
+pub struct LowerTextArea<'a> {
+    text: &'a Rope,
+    scroll_pos: &'a u8,
+}
+
+impl<'a> LowerTextArea<'a> {
+    pub fn new(app: &'a crate::app::App) -> Self {
+        LowerTextArea {
+            text: &app.buffer.text,
+            scroll_pos: app.get_scroll_pos(),
+        }
+    }
+}
+
+impl<'a> Widget for LowerTextArea<'a> {
+    fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
+        let scroll_pos = *self.scroll_pos as u16;
+        let text_start = scroll_pos as usize + 1;
+        let text_end = std::cmp::min(text_start + area.height as usize, self.text.len_lines());
+        for i in text_start..text_end {
+            let line = self.text.line(i); // panics
+            let ratatui_line = Line::raw(line);
+            _ = buf.set_line(
+                area.x,
+                area.y + (i - text_start) as u16,
+                &ratatui_line,
+                area.width,
+            )
+        }
+
+        let info_line_count = area.height as usize - (text_end - text_start);
+        for i in 0..info_line_count {
+            let ratatui_line = Line::raw("------LOWER INFO------");
+            _ = buf.set_line(
+                area.x,
+                area.y + (i + (text_end - text_start)) as u16,
+                &ratatui_line,
+                area.width,
+            )
         }
     }
 }
