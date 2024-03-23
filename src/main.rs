@@ -21,7 +21,6 @@ async fn main() -> AppResult<()> {
     let mut tui = Tui::new(terminal, events);
     tui.init()?;
 
-    // Start the main loop.
     while app.running {
         // Render the user interface.
         tui.draw(&mut app)?;
