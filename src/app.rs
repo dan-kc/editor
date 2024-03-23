@@ -66,12 +66,12 @@ impl App {
     }
 
     pub fn move_down(&mut self) {
-        // TODO: Prevent scrolling further than text buffer
-        // if *self.get_scroll_pos() as usize >= self.buffer.text.len_lines() - 1 {
-        //     panic!("YOU SCrolled too far m8")
-        // }
-        if let Some(res) = self.cursor.1.checked_add(1) {
-            self.cursor.1 = res;
+        if self.buffer.text.len_lines() as u8 != *self.get_scroll_pos() + 1 {
+            // prevent scrolling over
+            if let Some(res) = self.cursor.1.checked_add(1) {
+                self.cursor.1 = res;
+            }
         }
     }
+
 }
