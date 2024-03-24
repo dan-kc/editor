@@ -1,3 +1,4 @@
+use ratatui::prelude::*;
 use std::usize;
 
 use crate::app::Mode;
@@ -106,29 +107,49 @@ impl<'a> StatusLine<'a> {
 
 impl<'a> Widget for StatusLine<'a> {
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
-        let text = self.mode.get_text().clone();
-        let ratatui_line = Line::raw(text).style(Style::default().red());
-        _ = buf.set_line(area.x, area.y, &ratatui_line, area.width);
+        let mut text = self.mode.get_text().clone();
+        text.push(' ');
+        text.insert(0, ' ');
+        let style = match self.mode {
+            Mode::Normal => Style::default().fg(Color::Black).bg(Color::Blue),
+            Mode::Insert => Style::default().fg(Color::Black).bg(Color::Red),
+            Mode::GoTo => Style::default().fg(Color::Black).bg(Color::Green),
+        };
+        let ratatui_line = Span::styled(text, style);
+        _ = buf.set_span(area.x, area.y, &ratatui_line, area.width);
     }
 }
 
+#[allow(dead_code)]
 pub struct CursorLine<'a> {
     text: &'a Rope,
-    scroll_pos: &'a u8,
+    cursor: &'a (u8, u8),
+    mode: &'a Mode,
 }
 
 impl<'a> CursorLine<'a> {
-    pub fn new(text: &'a Rope, scroll_pos: &'a u8) -> Self {
-        CursorLine { text, scroll_pos }
+    pub fn new(text: &'a Rope, cursor: &'a (u8, u8), mode: &'a Mode) -> Self {
+        CursorLine { text, cursor, mode }
     }
 }
 
 impl<'a> Widget for CursorLine<'a> {
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
         let text = &self.text;
-        let scroll_pos = *self.scroll_pos as usize;
+        let scroll_pos = self.cursor.1 as usize;
+        let style = Style::default().fg(Color::White).bg(Color::Black);
+        let cursor_style = Style::default().fg(Color::White).bg(Color::DarkGray);
         let line = text.line(scroll_pos);
-        let ratatui_line = Line::styled(line, Style::default().green());
-        _ = buf.set_line(area.x, area.y, &ratatui_line, area.width)
+        let ratatui_line = Span::styled(line, style);
+        // let extra = Span::styled(content, style)
+        let ratatui_cursor = Span::styled(" ", cursor_style);
+        buf.set_style(area, style);
+        _ = buf.set_span(area.x, area.y, &ratatui_line, area.width);
+        _ = buf.set_span(
+            area.x + self.cursor.0 as u16,
+            area.y,
+            &ratatui_cursor,
+            area.width,
+        );
     }
 }

@@ -15,3 +15,7 @@ src/
 └── ui/
     └── widgets.rs     -> holds the UI widgets
 ```
+
+## TODO
+
+-- Implement insert mode

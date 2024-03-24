@@ -8,6 +8,7 @@ pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 pub enum Mode {
     Normal,
     Insert,
+    GoTo,
 }
 
 impl Mode {
@@ -15,6 +16,7 @@ impl Mode {
         match self {
             Mode::Normal => String::from("Normal"),
             Mode::Insert => String::from("Insert"),
+            Mode::GoTo => String::from("Go To "),
         }
     }
 }
@@ -74,4 +76,27 @@ impl App {
         }
     }
 
+    pub fn move_left(&mut self) {
+        if let Some(res) = self.cursor.0.checked_sub(1) {
+            self.cursor.0 = res;
+        }
+    }
+
+    pub fn move_right(&mut self) {
+        if let Some(res) = self.cursor.0.checked_add(1) {
+            self.cursor.0 = res;
+        }
+    }
+
+    pub fn move_to_top(&mut self) {
+        self.cursor.1 = 0;
+    }
+
+    pub fn move_to_bottom(&mut self) {
+        self.cursor.1 = self.buffer.text.len_lines() as u8 - 1;
+    }
+
+    pub fn enter_mode(&mut self, mode: Mode) {
+        self.mode = mode
+    }
 }
