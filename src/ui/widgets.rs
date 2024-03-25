@@ -4,7 +4,7 @@ use std::usize;
 use crate::app::Mode;
 use ratatui::{
     layout::Rect,
-    style::{Color, Style, Stylize},
+    style::{Color, Style},
     text::Line,
     widgets::Widget,
 };
@@ -18,7 +18,7 @@ pub struct UpperTextArea<'a> {
 impl<'a> UpperTextArea<'a> {
     pub fn new(app: &'a crate::app::App) -> Self {
         UpperTextArea {
-            text: &app.buffer.text,
+            text: &app.buffer.rope,
             scroll_pos: app.get_scroll_pos(),
         }
     }
@@ -32,9 +32,8 @@ impl<'a> Widget for UpperTextArea<'a> {
         } else {
             0
         };
-        // Mock of top git info window
         for i in 0..top_info_line_count {
-            let ratatui_line = Line::raw("----MOCK----");
+            let ratatui_line = Line::raw("----UPPER INFO----");
             _ = buf.set_line(0, i, &ratatui_line, area.width)
         }
 
@@ -60,7 +59,7 @@ pub struct LowerTextArea<'a> {
 impl<'a> LowerTextArea<'a> {
     pub fn new(app: &'a crate::app::App) -> Self {
         LowerTextArea {
-            text: &app.buffer.text,
+            text: &app.buffer.rope,
             scroll_pos: app.get_scroll_pos(),
         }
     }
@@ -112,8 +111,9 @@ impl<'a> Widget for StatusLine<'a> {
         text.insert(0, ' ');
         let style = match self.mode {
             Mode::Normal => Style::default().fg(Color::Black).bg(Color::Blue),
-            Mode::Insert => Style::default().fg(Color::Black).bg(Color::Red),
+            Mode::Insert => Style::default().fg(Color::Black).bg(Color::Cyan),
             Mode::GoTo => Style::default().fg(Color::Black).bg(Color::Green),
+            Mode::Delete => Style::default().fg(Color::Black).bg(Color::Red),
         };
         let ratatui_line = Span::styled(text, style);
         _ = buf.set_span(area.x, area.y, &ratatui_line, area.width);

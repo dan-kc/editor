@@ -27,6 +27,6 @@ pub fn render(app: &App, frame: &mut Frame) {
     frame.render_widget(StatusLine::new(&app.mode), status_line_layout[1]);
     frame.render_widget(UpperTextArea::new(app), upper_lower_layout[0]);
     #[rustfmt::skip]
-    frame.render_widget(CursorLine::new(&app.buffer.text, &app.cursor, &app.mode), upper_lower_layout[1]);
+    frame.render_widget(CursorLine::new(&app.buffer.rope, &app.cursor, &app.mode), upper_lower_layout[1]);
     frame.render_widget(LowerTextArea::new(app), upper_lower_layout[2]);
 }
