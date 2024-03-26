@@ -141,7 +141,6 @@ impl<'a> Widget for CursorLine<'a> {
         let cursor_style = Style::default().fg(Color::White).bg(Color::DarkGray);
         let line = text.line(scroll_pos);
         let ratatui_line = Span::styled(line, style);
-        // let extra = Span::styled(content, style)
         let ratatui_cursor = Span::styled(" ", cursor_style);
         buf.set_style(area, style);
         _ = buf.set_span(area.x, area.y, &ratatui_line, area.width);

@@ -43,7 +43,6 @@ impl Default for App {
 }
 
 impl App {
-    /// Constructs a new instance of [`App`].
     pub fn new(buffer: buffer::Buffer) -> Self {
         Self {
             buffer,

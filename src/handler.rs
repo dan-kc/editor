@@ -73,6 +73,9 @@ pub fn handle_go_to_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppRe
             app.move_to_top();
             app.enter_mode(Mode::Normal)
         }
+        KeyCode::Esc => {
+            app.enter_mode(Mode::Normal);
+        }
         _ => {}
     }
     Ok(())
@@ -84,6 +87,9 @@ pub fn handle_delete_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppR
         KeyCode::Char('d') => {
             app.delete_line();
             app.enter_mode(Mode::Normal)
+        }
+        KeyCode::Esc => {
+            app.enter_mode(Mode::Normal);
         }
         _ => {}
     }
