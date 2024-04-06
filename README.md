@@ -18,4 +18,5 @@ src/
 
 ## TODO
 
--- Implement insert mode
+-- Fix insert mode bug when cursor is out of bounds (don't display last line?)
+-- More motions
