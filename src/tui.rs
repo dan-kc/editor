@@ -1,55 +1,33 @@
-use crate::app::{App, AppResult};
-use crate::event::EventHandler;
-use crate::ui;
-use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
+use crate::{app::{App, AppResult}, ui};
 use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
-use ratatui::backend::Backend;
-use ratatui::Terminal;
-use std::io;
-use std::panic;
+use ratatui::{
+    backend::{Backend, CrosstermBackend},
+    Terminal,
+};
+use std::{io, panic};
 
-#[derive(Debug)]
-pub struct Tui<B: Backend> {
-    terminal: Terminal<B>,
-    pub events: EventHandler,
+pub fn init() -> AppResult<Terminal<impl Backend>> {
+    terminal::enable_raw_mode()?;
+    crossterm::execute!(io::stdout(), EnterAlternateScreen)?;
+    let terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
+    Ok(terminal)
 }
 
-impl<B: Backend> Tui<B> {
-    pub fn new(terminal: Terminal<B>, events: EventHandler) -> Self {
-        Self { terminal, events }
-    }
+pub fn exit() -> AppResult<()> {
+    crossterm::execute!(io::stdout(), LeaveAlternateScreen)?;
+    terminal::disable_raw_mode()?;
+    Ok(())
+}
 
-    pub fn init(&mut self) -> AppResult<()> {
-        terminal::enable_raw_mode()?;
-        crossterm::execute!(io::stderr(), EnterAlternateScreen, EnableMouseCapture)?;
+pub fn install_panic_hook() {
+    let original_hook = panic::take_hook();
+    panic::set_hook(Box::new(move |panic_info| {
+        exit().expect("custom panic hook failed i'm so sorry i fucked up your terminal");
+        original_hook(panic_info);
+    }));
+}
 
-        // Define a custom panic hook to reset the terminal properties.
-        // This way, you won't have your terminal messed up if an unexpected error happens.
-        let panic_hook = panic::take_hook();
-        panic::set_hook(Box::new(move |panic| {
-            Self::reset().expect("failed to reset the terminal");
-            panic_hook(panic);
-        }));
-
-        self.terminal.hide_cursor()?;
-        self.terminal.clear()?;
-        Ok(())
-    }
-
-    pub fn draw(&mut self, app: &mut App) -> AppResult<()> {
-        self.terminal.draw(|frame| ui::render(app, frame))?;
-        Ok(())
-    }
-
-    fn reset() -> AppResult<()> {
-        terminal::disable_raw_mode()?;
-        crossterm::execute!(io::stderr(), LeaveAlternateScreen, DisableMouseCapture)?;
-        Ok(())
-    }
-
-    pub fn exit(&mut self) -> AppResult<()> {
-        Self::reset()?;
-        self.terminal.show_cursor()?;
-        Ok(())
-    }
+pub fn draw(terminal: &mut Terminal<impl Backend>, app: &App) -> AppResult<()> {
+    terminal.draw(|frame| ui::render(app, frame))?;
+    Ok(())
 }

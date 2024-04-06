@@ -1,5 +1,21 @@
-use crate::app::{App, AppResult, Mode};
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crate::{
+    app::{App, AppResult, Mode},
+    logger::Level,
+};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+/// updates the application's state based on user input
+
+pub fn handle_events(app: &mut App) -> AppResult<()> {
+    match event::read()? {
+        // it's important to check that the event is a key press event as
+        // crossterm also emits key release and repeat events on Windows.
+        Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
+            handle_key_events(key_event, app)?
+        }
+        _ => {}
+    };
+    Ok(())
+}
 
 pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
     match app.mode {
@@ -42,6 +58,9 @@ pub fn handle_normal_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppR
         KeyCode::Char('G') => {
             app.move_to_bottom();
         }
+        KeyCode::Char('w') => {
+            app.move_next_word_start();
+        }
         _ => {}
     }
     Ok(())
@@ -55,9 +74,7 @@ pub fn handle_insert_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppR
         KeyCode::Down => {
             app.move_down();
         }
-        KeyCode::Char(char) => {
-            app.insert(char)
-        }
+        KeyCode::Char(char) => app.insert(char),
         KeyCode::Esc => {
             app.enter_mode(Mode::Normal);
         }
@@ -66,7 +83,6 @@ pub fn handle_insert_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppR
     Ok(())
 }
 
-#[allow(clippy::single_match)]
 pub fn handle_go_to_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
     match key_event.code {
         KeyCode::Char('g') => {
@@ -81,11 +97,11 @@ pub fn handle_go_to_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppRe
     Ok(())
 }
 
-#[allow(clippy::single_match)]
 pub fn handle_delete_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
     match key_event.code {
         KeyCode::Char('d') => {
             app.delete_line();
+            app.logger.log(Level::Info, String::from("deleted line"));
             app.enter_mode(Mode::Normal)
         }
         KeyCode::Esc => {
