@@ -7,8 +7,6 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifier
 
 pub fn handle_events(app: &mut App) -> AppResult<()> {
     match event::read()? {
-        // it's important to check that the event is a key press event as
-        // crossterm also emits key release and repeat events on Windows.
         Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
             handle_key_events(key_event, app)?
         }
