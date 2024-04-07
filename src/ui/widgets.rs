@@ -44,15 +44,16 @@ impl<'a> Widget for UpperTextArea<'a> {
             } else {
                 i as usize
             };
-            let line = self.rope.line(line_number); // panics
-            let ratatui_line = Line::raw(line.to_string());
+            #[rustfmt::skip]
+            let line = self.rope.line(line_number).to_string().populate_fill_chars(); // panics
+            let ratatui_line = Line::raw(line);
             _ = buf.set_line(0, i + top_info_line_count, &ratatui_line, area.width)
         }
     }
 }
 
 pub struct LowerTextArea<'a> {
-    text: &'a Rope,
+    rope: &'a Rope,
     scroll_pos: &'a usize,
     logger: &'a Logger,
 }
@@ -61,7 +62,7 @@ impl<'a> LowerTextArea<'a> {
     pub fn new(app: &'a crate::app::App) -> Self {
         LowerTextArea {
             logger: &app.logger,
-            text: &app.buffer.rope,
+            rope: &app.buffer.rope,
             scroll_pos: app.scroll_pos(),
         }
     }
@@ -71,10 +72,11 @@ impl<'a> Widget for LowerTextArea<'a> {
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
         let scroll_pos = *self.scroll_pos as u16;
         let text_start = scroll_pos as usize + 1;
-        let text_end = std::cmp::min(text_start + area.height as usize, self.text.line_len());
+        let text_end = std::cmp::min(text_start + area.height as usize, self.rope.line_len());
         for i in text_start..text_end {
-            let line = self.text.line(i); // panics
-            let ratatui_line = Line::raw(line.to_string());
+            #[rustfmt::skip]
+            let line = self.rope.line(i).to_string().populate_fill_chars(); // panics
+            let ratatui_line = Line::raw(line);
             _ = buf.set_line(
                 area.x,
                 area.y + (i - text_start) as u16,
@@ -125,24 +127,24 @@ impl<'a> Widget for StatusLine<'a> {
 
 #[allow(dead_code)]
 pub struct CursorLine<'a> {
-    text: &'a Rope,
+    rope: &'a Rope,
     cursor: &'a (usize, usize),
     mode: &'a Mode,
 }
 
 impl<'a> CursorLine<'a> {
-    pub fn new(text: &'a Rope, cursor: &'a (usize, usize), mode: &'a Mode) -> Self {
-        CursorLine { text, cursor, mode }
+    pub fn new(rope: &'a Rope, cursor: &'a (usize, usize), mode: &'a Mode) -> Self {
+        CursorLine { rope, cursor, mode }
     }
 }
 
 impl<'a> Widget for CursorLine<'a> {
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
-        let text = &self.text;
         let scroll_pos = self.cursor.1;
         let style = Style::default().fg(Color::White).bg(Color::Black);
         let cursor_style = self.mode.color();
-        let line = text.line(scroll_pos);
+        #[rustfmt::skip]
+        let line = self.rope.line(scroll_pos).to_string().populate_fill_chars(); // panics
         let ratatui_line = Span::styled(line.to_string(), style);
         let ratatui_cursor = Span::styled(" ", cursor_style);
         buf.set_style(area, style);
@@ -153,5 +155,15 @@ impl<'a> Widget for CursorLine<'a> {
             &ratatui_cursor,
             area.width,
         );
+    }
+}
+
+pub trait PopulateFillChars {
+    fn populate_fill_chars(&mut self) -> Self;
+}
+
+impl PopulateFillChars for String {
+    fn populate_fill_chars(&mut self) -> Self {
+        self.replace(' ', "·")
     }
 }
