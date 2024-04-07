@@ -1,9 +1,11 @@
 use editor::{
-    app::{self, AppResult, RunningState}, buffer::Buffer, handler, tui
+    app::{self, AppResult, RunningState},
+    buffer::Buffer,
+    handler, tui,
 };
 
 fn main() -> AppResult<()> {
-    let path = std::env::args().nth(1).expect("no path given");
+    let path = std::env::args().nth(1).expect("file name not found");
     let buffer = Buffer::from_file(&path).expect("could not find file");
     tui::install_panic_hook();
     let mut terminal = tui::init()?;

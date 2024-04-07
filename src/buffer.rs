@@ -31,21 +31,10 @@ impl FileReader for Rope {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Buffer {
     pub file_name: String,
     pub rope: Rope,
-}
-
-impl Default for Buffer {
-    fn default() -> Self {
-        let rope = Rope::default();
-        // TODO: insert an extra dummy line?
-        Buffer {
-            file_name: Default::default(),
-            rope,
-        }
-    }
 }
 
 impl Buffer {
