@@ -2,13 +2,34 @@ use crop::Rope;
 use ratatui::prelude::*;
 use std::usize;
 
-use crate::{app::Mode, logger::Logger};
+use crate::{
+    app::{App, Mode},
+    logger::Logger,
+};
 use ratatui::{
     layout::Rect,
     style::{Color, Style},
     text::Line,
     widgets::Widget,
 };
+
+pub struct GitSummary<'a> {
+    app: &'a App,
+}
+impl<'a> GitSummary<'a> {
+    pub fn new(app: &'a App) -> Self {
+        GitSummary { app }
+    }
+}
+
+impl<'a> Widget for GitSummary<'a> {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        for i in 0..area.height {
+            let ratatui_line = Line::raw("Git info placeholder");
+            _ = buf.set_line(area.x, area.y + i, &ratatui_line, area.width)
+        }
+    }
+}
 
 pub struct UpperTextArea<'a> {
     rope: &'a Rope,
@@ -26,28 +47,33 @@ impl<'a> UpperTextArea<'a> {
 
 impl<'a> Widget for UpperTextArea<'a> {
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
-        let scroll_pos = *self.scroll_pos as u16;
-        let top_info_line_count = if area.height >= scroll_pos {
-            area.height - *self.scroll_pos as u16
-        } else {
-            0
-        };
-        for i in 0..top_info_line_count {
-            let ratatui_line = Line::raw("----UPPER INFO----");
-            _ = buf.set_line(0, i, &ratatui_line, area.width)
+        for i in 0..area.height {
+            let rope_idx = self.scroll_pos - area.height as usize + i as usize;
+            let line = self.rope.line(rope_idx).to_string().populate_fill_chars(); // panics
+            let ratatui_line = Span::raw(line);
+            _ = buf.set_span(area.x, area.y + i, &ratatui_line, area.width)
         }
+    }
+}
 
-        let text_line_count = std::cmp::min(scroll_pos, area.height);
-        for i in 0..text_line_count {
-            let line_number = if scroll_pos >= area.height {
-                (i + scroll_pos - area.height) as usize
-            } else {
-                i as usize
+pub struct Logs<'a> {
+    logger: &'a Logger,
+}
+
+impl<'a> Logs<'a> {
+    pub fn new(logger: &'a Logger) -> Self {
+        Logs { logger }
+    }
+}
+
+impl<'a> Widget for Logs<'a> {
+    fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
+        for i in 0..area.height {
+            let ratatui_line = match self.logger.logs.iter().rev().nth(i as usize) {
+                Some(log) => Line::from(log.to_string()),
+                None => Line::raw("------LOWER INFO PLACEHOLDER------"),
             };
-            #[rustfmt::skip]
-            let line = self.rope.line(line_number).to_string().populate_fill_chars(); // panics
-            let ratatui_line = Line::raw(line);
-            _ = buf.set_line(0, i + top_info_line_count, &ratatui_line, area.width)
+            _ = buf.set_line(area.x, area.y + i as u16, &ratatui_line, area.width)
         }
     }
 }
@@ -55,13 +81,11 @@ impl<'a> Widget for UpperTextArea<'a> {
 pub struct LowerTextArea<'a> {
     rope: &'a Rope,
     scroll_pos: &'a usize,
-    logger: &'a Logger,
 }
 
 impl<'a> LowerTextArea<'a> {
     pub fn new(app: &'a crate::app::App) -> Self {
         LowerTextArea {
-            logger: &app.logger,
             rope: &app.buffer.rope,
             scroll_pos: app.scroll_pos(),
         }
@@ -70,36 +94,11 @@ impl<'a> LowerTextArea<'a> {
 
 impl<'a> Widget for LowerTextArea<'a> {
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
-        let scroll_pos = *self.scroll_pos as u16;
-        let text_start = scroll_pos as usize + 1;
-        let text_end = std::cmp::min(text_start + area.height as usize, self.rope.line_len());
-        for i in text_start..text_end {
-            #[rustfmt::skip]
-            let line = self.rope.line(i).to_string().populate_fill_chars(); // panics
-            let ratatui_line = Line::raw(line);
-            _ = buf.set_line(
-                area.x,
-                area.y + (i - text_start) as u16,
-                &ratatui_line,
-                area.width,
-            )
-        }
-
-        let info_line_count = area.height as usize - (text_end - text_start);
-        for i in 0..info_line_count {
-            let ratatui_line = match self.logger.logs.iter().rev().nth(i) {
-                Some(log) => {
-                    let log_string = format!("{}", log);
-                    Line::from(log_string)
-                }
-                None => Line::raw("------LOWER INFO PLACEHOLDER------"),
-            };
-            _ = buf.set_line(
-                area.x,
-                area.y + (i + (text_end - text_start)) as u16,
-                &ratatui_line,
-                area.width,
-            )
+        for i in 0..area.height {
+            let rope_idx = self.scroll_pos + 1 + i as usize;
+            let line = self.rope.line(rope_idx).to_string().populate_fill_chars(); // panics
+            let ratatui_line = Span::raw(line);
+            _ = buf.set_span(area.x, area.y + i, &ratatui_line, area.width)
         }
     }
 }

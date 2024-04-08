@@ -27,6 +27,7 @@ impl FileReader for Rope {
                 }
             };
         }
+        // rope_builder.append("\n");
         Ok(rope_builder.build())
     }
 }
