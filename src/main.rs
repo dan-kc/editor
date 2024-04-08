@@ -11,10 +11,8 @@ fn main() -> AppResult<()> {
     let mut terminal = tui::init()?;
     let mut app = app::App::new(buffer);
     while app.running_state == RunningState::Running {
-        // Render the current view
         tui::draw(&mut terminal, &app)?;
-        // Block until we get an event
-        handler::handle_events(&mut app)?;
+        handler::handle_events(&mut app)?; // blocks
     }
 
     tui::exit()?;
