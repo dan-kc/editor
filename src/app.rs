@@ -72,27 +72,22 @@ impl App {
         self.running_state = RunningState::Done;
     }
 
-    pub fn scroll_pos(&self) -> &usize {
-        &self.cursor.1
+    pub fn scroll_pos(&self) -> usize {
+        self.cursor.1
     }
 
-    pub fn insert(&mut self, char: char) {
-        let line_idx = *self.scroll_pos();
-        let byte_idx = self.buffer.rope.byte_of_line(line_idx) + self.cursor.0;
-        self.buffer.rope.insert(byte_idx, &char.to_string());
+    pub fn insert_char(&mut self, char: char) {
+        let byte_idx = self
+            .buffer
+            .byte_idx_of_cursor_pos(self.cursor)
+            .expect("out of bounds");
+        self.buffer.insert(byte_idx, char.to_string());
         self.move_right();
     }
 
-    #[allow(dead_code)]
-    fn is_last_line(&mut self) -> bool {
-        self.cursor.1 == self.buffer.rope.line_len()
-    }
-
     pub fn delete_line(&mut self) {
-        let line_idx = *self.scroll_pos();
-        let start = self.buffer.rope.byte_of_line(line_idx);
-        let end = self.buffer.rope.byte_of_line(line_idx + 1);
-        self.buffer.rope.delete(start..end);
+        let line_idx = self.scroll_pos();
+        self.buffer.remove_line(line_idx);
     }
 
     pub fn move_up(&mut self) {
@@ -102,7 +97,7 @@ impl App {
     }
 
     pub fn move_down(&mut self) {
-        if self.buffer.rope.line_len() != *self.scroll_pos() + 1 {
+        if self.buffer.len_lines() != self.scroll_pos() + 1 {
             // prevent scrolling over
             if let Some(res) = self.cursor.1.checked_add(1) {
                 self.cursor.1 = res;
@@ -127,18 +122,11 @@ impl App {
     }
 
     pub fn move_to_bottom(&mut self) {
-        self.cursor.1 = self.buffer.rope.line_len() - 1;
+        self.cursor.1 = self.buffer.len_lines() - 1;
     }
 
     pub fn enter_mode(&mut self, mode: Mode) {
         self.mode = mode
-    }
-
-    fn curr_len_line(&mut self) -> usize {
-        let line_idx = *self.scroll_pos();
-        let start = self.buffer.rope.byte_of_line(line_idx);
-        let end = self.buffer.rope.byte_of_line(line_idx + 1);
-        end - start
     }
 
     pub fn move_next_word_start(&mut self) {
@@ -147,6 +135,7 @@ impl App {
         // check if there is a next start of word
         // if not, return err
         // if so, then move to that char idx
+        todo!()
     }
 
     pub fn move_start_line(&mut self) {

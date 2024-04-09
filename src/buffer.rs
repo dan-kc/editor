@@ -1,6 +1,7 @@
 use std::{
     fs::File,
     io::{self, BufRead, BufReader},
+    ops::RangeBounds,
 };
 
 use crop::{Rope, RopeBuilder};
@@ -27,7 +28,7 @@ impl FileReader for Rope {
                 }
             };
         }
-        // rope_builder.append("\n");
+        rope_builder.append("EOF");
         Ok(rope_builder.build())
     }
 }
@@ -35,10 +36,11 @@ impl FileReader for Rope {
 #[derive(Debug, Default)]
 pub struct Buffer {
     pub file_name: String,
-    pub rope: Rope,
+    rope: Rope,
 }
 
 impl Buffer {
+    // Create text buffer from file
     pub fn from_file(file_name: &str) -> io::Result<Buffer> {
         let rope = Rope::from_file(File::open(file_name)?)?;
         let buf = Buffer {
@@ -46,5 +48,51 @@ impl Buffer {
             rope,
         };
         Ok(buf)
+    }
+    /// Number of lines in buffer.
+    pub fn len_lines(&self) -> usize {
+        self.rope.line_len() - 1
+    }
+    // Line as a string.
+    pub fn line(&self, idx: usize) -> String {
+        self.rope.line(idx).to_string()
+    }
+    /// Byte index of first byte in line.
+    pub fn byte_idx_of_line_start(&self, idx: usize) -> usize {
+        self.rope.byte_of_line(idx)
+    }
+    /// Byte index of last byte in line.
+    pub fn byte_idx_of_line_end(&self, idx: usize) -> usize {
+        self.rope.byte_of_line(idx + 1) - 1
+    }
+    /// Byte index of line with char_offset
+    pub fn byte_idx_of_char(&self, line_idx: usize, char_offset: usize) -> Option<usize> {
+        let line = self.line(line_idx);
+        if char_offset >= line.len() {
+            return None;
+        }
+
+        let mut byte_idx = 0;
+        for (i, c) in line.chars().enumerate() {
+            if i == char_offset {
+                return Some(byte_idx);
+            }
+            byte_idx += c.len_utf8();
+        }
+
+        None
+    }
+    /// Byte index of cursor position
+    pub fn byte_idx_of_cursor_pos(&self, cursor: (usize, usize)) -> Option<usize> {
+        self.byte_idx_of_char(cursor.0, cursor.1)
+    }
+    pub fn remove<R: RangeBounds<usize>>(&mut self, byte_range: R) {
+        self.rope.delete(byte_range)
+    }
+    pub fn remove_line(&mut self, line_idx: usize) {
+        self.remove(self.byte_idx_of_line_start(line_idx)..=self.byte_idx_of_line_end(line_idx))
+    }
+    pub fn insert(&mut self, byte_offset: usize, text: String) {
+        self.rope.insert(byte_offset, text)
     }
 }

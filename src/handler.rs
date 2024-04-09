@@ -72,7 +72,7 @@ pub fn handle_insert_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppR
         KeyCode::Down => {
             app.move_down();
         }
-        KeyCode::Char(char) => app.insert(char),
+        KeyCode::Char(char) => app.insert_char(char),
         KeyCode::Esc => {
             app.enter_mode(Mode::Normal);
         }
@@ -100,7 +100,8 @@ pub fn handle_delete_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppR
         KeyCode::Char('d') => {
             app.delete_line();
             app.logger.log(Level::Info, String::from("deleted line"));
-            app.enter_mode(Mode::Normal)
+            app.enter_mode(Mode::Normal);
+            app.move_up();
         }
         KeyCode::Esc => {
             app.enter_mode(Mode::Normal);
