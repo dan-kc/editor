@@ -38,7 +38,7 @@ pub fn render(app: &App, frame: &mut Frame) {
         ])
         .split(window_layout[0]);
 
-    let len_lines = app.buffer.len_lines() as u16;
+    let len_lines = app.buffer().len_lines() as u16;
     let lower_text_area_size = std::cmp::min(lower_window_size, len_lines - 1 - scroll_pos);
     let logs_size = lower_window_size - lower_text_area_size;
 
@@ -50,11 +50,17 @@ pub fn render(app: &App, frame: &mut Frame) {
         ])
         .split(window_layout[2]);
 
-    frame.render_widget(StatusLine::new(&app.mode), outer_layout[1]);
+    frame.render_widget(StatusLine::new(app.mode()), outer_layout[1]);
     frame.render_widget(GitSummary::new(app), upper_window_layout[0]);
-    frame.render_widget(UpperTextArea::new(&app.buffer, app.scroll_pos()), upper_window_layout[1]);
+    frame.render_widget(
+        UpperTextArea::new(app.buffer(), app.scroll_pos()),
+        upper_window_layout[1],
+    );
     #[rustfmt::skip]
-    frame.render_widget(CursorLine::new(&app.buffer, &app.cursor, &app.mode), window_layout[1]);
-    frame.render_widget(LowerTextArea::new(&app.buffer, app.scroll_pos()), lower_window_layout[0]);
-    frame.render_widget(Logs::new(&app.logger), lower_window_layout[1]);
+    frame.render_widget(CursorLine::new(app.buffer(), app.cursor(), app.scroll_pos(), app.mode()), window_layout[1]);
+    frame.render_widget(
+        LowerTextArea::new(app.buffer(), app.scroll_pos()),
+        lower_window_layout[0],
+    );
+    frame.render_widget(Logs::new(app.logger()), lower_window_layout[1]);
 }

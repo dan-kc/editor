@@ -16,7 +16,7 @@ pub fn handle_events(app: &mut App) -> AppResult<()> {
 }
 
 pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
-    match app.mode {
+    match app.mode() {
         Mode::Normal => handle_normal_mode_key_events(key_event, app)?,
         Mode::Insert => handle_insert_mode_key_events(key_event, app)?,
         Mode::GoTo => handle_go_to_mode_key_events(key_event, app)?,
@@ -99,7 +99,7 @@ pub fn handle_delete_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppR
     match key_event.code {
         KeyCode::Char('d') => {
             app.delete_line();
-            app.logger.log(Level::Info, String::from("deleted line"));
+            app.logger_mut().log(Level::Info, String::from("deleted line"));
             app.enter_mode(Mode::Normal);
             app.move_up();
         }

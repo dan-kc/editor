@@ -6,6 +6,8 @@ use std::{
 
 use crop::{Rope, RopeBuilder};
 
+use crate::app::Cursor;
+
 trait FileReader {
     fn from_file(file: File) -> io::Result<Rope>;
 }
@@ -35,7 +37,7 @@ impl FileReader for Rope {
 
 #[derive(Debug, Default)]
 pub struct Buffer {
-    pub file_name: String,
+    file_name: String,
     rope: Rope,
 }
 
@@ -48,6 +50,9 @@ impl Buffer {
             rope,
         };
         Ok(buf)
+    }
+    pub fn file_name(&self) -> &String {
+        &self.file_name
     }
     /// Number of lines in buffer.
     pub fn len_lines(&self) -> usize {
@@ -83,8 +88,8 @@ impl Buffer {
         None
     }
     /// Byte index of cursor position
-    pub fn byte_idx_of_cursor_pos(&self, cursor: (usize, usize)) -> Option<usize> {
-        self.byte_idx_of_char(cursor.0, cursor.1)
+    pub fn byte_idx_of_cursor_pos(&self, cursor: &Cursor) -> Option<usize> {
+        self.byte_idx_of_char(cursor.y(), cursor.x())
     }
     pub fn remove<R: RangeBounds<usize>>(&mut self, byte_range: R) {
         self.rope.delete(byte_range)
@@ -94,5 +99,10 @@ impl Buffer {
     }
     pub fn insert(&mut self, byte_offset: usize, text: String) {
         self.rope.insert(byte_offset, text)
+    }
+    /// Calculates the with of number column
+    /// letf margin + right margin + border = 3
+    pub fn line_numb_col_width(&self) -> usize {
+        self.len_lines().to_string().len() + 3
     }
 }

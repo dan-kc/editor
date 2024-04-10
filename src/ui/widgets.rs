@@ -1,5 +1,5 @@
 use crate::{
-    app::{App, Mode},
+    app::{App, Cursor, Mode},
     buffer::Buffer,
     logger::Logger,
 };
@@ -10,7 +10,7 @@ use ratatui::{
     text::Line,
     widgets::Widget,
 };
-use std::usize;
+use std::{str::FromStr, usize};
 
 pub struct GitSummary<'a> {
     app: &'a App,
@@ -43,11 +43,31 @@ impl<'a> UpperTextArea<'a> {
 
 impl<'a> Widget for UpperTextArea<'a> {
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
+        // render line cols
+        for i in 0..area.height {
+            let rope_idx = self.scroll_pos - area.height as usize + i as usize;
+            let mut line_numb = String::new();
+            line_numb.push(' ');
+            line_numb.push_str(&rope_idx.to_string());
+            let line_numb_len = line_numb.len();
+            for _ in 1..(self.buffer.line_numb_col_width() - line_numb_len - 2) {
+                line_numb.push(' ');
+            }
+            line_numb.push('┆');
+                line_numb.push(' ');
+            let ratatui_line = Span::raw(line_numb);
+            _ = buf.set_span(area.x, area.y + i, &ratatui_line, area.width)
+        }
         for i in 0..area.height {
             let rope_idx = self.scroll_pos - area.height as usize + i as usize;
             let line = self.buffer.line(rope_idx).to_string().populate_fill_chars(); // panics
             let ratatui_line = Span::raw(line);
-            _ = buf.set_span(area.x, area.y + i, &ratatui_line, area.width)
+            _ = buf.set_span(
+                self.buffer.line_numb_col_width() as u16 + area.x,
+                area.y + i,
+                &ratatui_line,
+                area.width,
+            )
         }
     }
 }
@@ -65,9 +85,9 @@ impl<'a> Logs<'a> {
 impl<'a> Widget for Logs<'a> {
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
         for i in 0..area.height {
-            let ratatui_line = match self.logger.logs.iter().rev().nth(i as usize) {
+            let ratatui_line = match self.logger.logs().iter().rev().nth(i as usize) {
                 Some(log) => Line::from(log.to_string()),
-                None => Line::raw("LACEHOLDER"),
+                None => Line::raw("PLACEHOLDER"),
             };
             _ = buf.set_line(area.x, area.y + i, &ratatui_line, area.width)
         }
@@ -120,13 +140,15 @@ impl<'a> Widget for StatusLine<'a> {
 #[allow(dead_code)]
 pub struct CursorLine<'a> {
     buffer: &'a Buffer,
-    cursor: &'a (usize, usize),
+    cursor: &'a Cursor,
+    scroll_pos: usize,
     mode: &'a Mode,
 }
 
 impl<'a> CursorLine<'a> {
-    pub fn new(buffer: &'a Buffer, cursor: &'a (usize, usize), mode: &'a Mode) -> Self {
+    pub fn new(buffer: &'a Buffer, cursor: &'a Cursor, scroll_pos: usize, mode: &'a Mode) -> Self {
         CursorLine {
+            scroll_pos,
             buffer,
             cursor,
             mode,
@@ -136,7 +158,7 @@ impl<'a> CursorLine<'a> {
 
 impl<'a> Widget for CursorLine<'a> {
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
-        let scroll_pos = self.cursor.1;
+        let scroll_pos = self.scroll_pos;
         let style = Style::default().fg(Color::White).bg(Color::Black);
         let cursor_style = self.mode.color();
         #[rustfmt::skip]
@@ -146,7 +168,7 @@ impl<'a> Widget for CursorLine<'a> {
         buf.set_style(area, style);
         _ = buf.set_span(area.x, area.y, &ratatui_line, area.width);
         _ = buf.set_span(
-            area.x + self.cursor.0 as u16,
+            area.x + self.cursor.x() as u16,
             area.y,
             &ratatui_cursor,
             area.width,

@@ -10,7 +10,7 @@ fn main() -> AppResult<()> {
     tui::install_panic_hook();
     let mut terminal = tui::init()?;
     let mut app = app::App::new(buffer);
-    while app.running_state == RunningState::Running {
+    while *app.running_state() == RunningState::Running {
         tui::draw(&mut terminal, &app)?;
         handler::handle_events(&mut app)?; // blocks
     }

@@ -10,7 +10,16 @@ use crate::app::AppResult;
 
 #[derive(Debug, Default)]
 pub struct Logger {
-    pub logs: Vec<Log>,
+    logs: Vec<Log>,
+}
+
+impl Logger {
+    pub fn logs(&self) -> &Vec<Log> {
+        &self.logs
+    }
+    pub fn logs_mut(&mut self) -> &mut Vec<Log> {
+        &mut self.logs
+    }
 }
 
 #[derive(Debug)]
