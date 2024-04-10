@@ -10,8 +10,9 @@ use ratatui::{
     text::Line,
     widgets::Widget,
 };
-use std::{str::FromStr, usize};
+use std::{ops::RangeBounds, usize};
 
+#[allow(dead_code)]
 pub struct GitSummary<'a> {
     app: &'a App,
 }
@@ -46,21 +47,14 @@ impl<'a> Widget for UpperTextArea<'a> {
         // render line cols
         for i in 0..area.height {
             let rope_idx = self.scroll_pos - area.height as usize + i as usize;
-            let mut line_numb = String::new();
-            line_numb.push(' ');
-            line_numb.push_str(&rope_idx.to_string());
-            let line_numb_len = line_numb.len();
-            for _ in 1..(self.buffer.line_numb_col_width() - line_numb_len - 2) {
-                line_numb.push(' ');
-            }
-            line_numb.push('┆');
-                line_numb.push(' ');
+            let line_numb = self.buffer.numb_col(rope_idx);
             let ratatui_line = Span::raw(line_numb);
             _ = buf.set_span(area.x, area.y + i, &ratatui_line, area.width)
         }
+
         for i in 0..area.height {
             let rope_idx = self.scroll_pos - area.height as usize + i as usize;
-            let line = self.buffer.line(rope_idx).to_string().populate_fill_chars(); // panics
+            let line = self.buffer.line(rope_idx).populate_fill_chars(); // panics
             let ratatui_line = Span::raw(line);
             _ = buf.set_span(
                 self.buffer.line_numb_col_width() as u16 + area.x,
@@ -107,22 +101,30 @@ impl<'a> LowerTextArea<'a> {
 
 impl<'a> Widget for LowerTextArea<'a> {
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
+        // render line cols
+        for i in 0..area.height {
+            let rope_idx = self.scroll_pos + 1 + i as usize;
+            let line_numb = self.buffer.numb_col(rope_idx);
+            let ratatui_line = Span::raw(line_numb);
+            _ = buf.set_span(area.x, area.y + i, &ratatui_line, area.width)
+        }
         for i in 0..area.height {
             let rope_idx = self.scroll_pos + 1 + i as usize;
             let line = self.buffer.line(rope_idx).to_string().populate_fill_chars(); // panics
             let ratatui_line = Span::raw(line);
-            _ = buf.set_span(area.x, area.y + i, &ratatui_line, area.width)
+            _ = buf.set_span(self.buffer.line_numb_col_width() as u16 + area.x, area.y + i, &ratatui_line, area.width)
         }
     }
 }
 
 pub struct StatusLine<'a> {
     mode: &'a Mode,
+    buffer: &'a Buffer,
 }
 
 impl<'a> StatusLine<'a> {
-    pub fn new(mode: &'a Mode) -> Self {
-        StatusLine { mode }
+    pub fn new(mode: &'a Mode, buffer: &'a Buffer) -> Self {
+        StatusLine { mode, buffer }
     }
 }
 
@@ -133,7 +135,7 @@ impl<'a> Widget for StatusLine<'a> {
         text.insert(0, ' ');
         let style = self.mode.color();
         let ratatui_line = Span::styled(text, style);
-        _ = buf.set_span(area.x, area.y, &ratatui_line, area.width);
+        _ = buf.set_span(self.buffer.line_numb_col_width() as u16, area.y, &ratatui_line, area.width);
     }
 }
 
@@ -159,6 +161,11 @@ impl<'a> CursorLine<'a> {
 impl<'a> Widget for CursorLine<'a> {
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
         let scroll_pos = self.scroll_pos;
+        // render line cols
+        let line_numb = self.buffer.numb_col(scroll_pos);
+        let ratatui_line = Span::raw(line_numb);
+        _ = buf.set_span(area.x, area.y, &ratatui_line, area.width);
+
         let style = Style::default().fg(Color::White).bg(Color::Black);
         let cursor_style = self.mode.color();
         #[rustfmt::skip]
@@ -166,7 +173,7 @@ impl<'a> Widget for CursorLine<'a> {
         let ratatui_line = Span::styled(line.to_string(), style);
         let ratatui_cursor = Span::styled(" ", cursor_style);
         buf.set_style(area, style);
-        _ = buf.set_span(area.x, area.y, &ratatui_line, area.width);
+        _ = buf.set_span(area.x + self.buffer.line_numb_col_width() as u16, area.y, &ratatui_line, area.width);
         _ = buf.set_span(
             area.x + self.cursor.x() as u16,
             area.y,

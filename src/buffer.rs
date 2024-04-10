@@ -58,9 +58,23 @@ impl Buffer {
     pub fn len_lines(&self) -> usize {
         self.rope.line_len() - 1
     }
-    // Line as a string.
+    // Rope line as a string.
     pub fn line(&self, idx: usize) -> String {
         self.rope.line(idx).to_string()
+    }
+    // Line col segment for line.
+    pub fn numb_col(&self, line_idx: usize) -> String {
+        let mut res: String = " ".to_string();
+        let total_width = self.line_numb_col_width();
+        let line_numb = &line_idx.to_string();
+        res.push_str(line_numb);
+        let right_padding_width = total_width - 3 - line_numb.len();
+        for _ in 0..right_padding_width {
+            res.push(' ');
+        }
+        res.push('┆');
+        res.push(' ');
+        res
     }
     /// Byte index of first byte in line.
     pub fn byte_idx_of_line_start(&self, idx: usize) -> usize {
@@ -101,7 +115,7 @@ impl Buffer {
         self.rope.insert(byte_offset, text)
     }
     /// Calculates the with of number column
-    /// letf margin + right margin + border = 3
+    /// left margin + right margin + border = 3
     pub fn line_numb_col_width(&self) -> usize {
         self.len_lines().to_string().len() + 3
     }

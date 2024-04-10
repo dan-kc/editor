@@ -50,7 +50,7 @@ pub fn render(app: &App, frame: &mut Frame) {
         ])
         .split(window_layout[2]);
 
-    frame.render_widget(StatusLine::new(app.mode()), outer_layout[1]);
+    frame.render_widget(StatusLine::new(app.mode(), app.buffer()), outer_layout[1]);
     frame.render_widget(GitSummary::new(app), upper_window_layout[0]);
     frame.render_widget(
         UpperTextArea::new(app.buffer(), app.scroll_pos()),

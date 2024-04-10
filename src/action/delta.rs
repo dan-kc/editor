@@ -1,20 +1,22 @@
 use chrono::{DateTime, Local};
 use rusqlite::Connection;
-use uuid::Uuid;
 
-use super::{ActionError, ActionResult};
+use super::ActionResult;
 
 // the granular building block of an action. Each action can contain multiple deltas
+#[allow(dead_code)]
 enum Delta {
     Insert { position: usize, text: String },
     Delete { position: usize, length: usize },
 }
 
+#[allow(dead_code)]
 struct Action {
     timestamp: DateTime<Local>,
     deltas: Vec<Delta>,
 }
 
+#[allow(dead_code)]
 const CREATE_TABLE_QUERY: &str = "
     CREATE TABLE IF NOT EXISTS deltas (
         id INTEGER PRIMARY KEY,
@@ -25,6 +27,8 @@ const CREATE_TABLE_QUERY: &str = "
     );
 ";
 
+#[allow(dead_code)]
+#[allow(unused_variables)]
 impl Action {
     fn insert_into_db(&self, conn: &Connection) -> ActionResult<()> {
         // let tx = conn.transaction().map_err(ActionError::DatabaseError)?;

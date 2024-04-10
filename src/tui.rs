@@ -26,7 +26,6 @@ pub fn install_panic_hook() {
         original_hook(panic_info);
     }));
 }
-
 pub fn draw(terminal: &mut Terminal<impl Backend>, app: &App) -> AppResult<()> {
     terminal.draw(|frame| ui::render(app, frame))?;
     Ok(())
