@@ -66,7 +66,7 @@ impl Buffer {
     pub fn numb_col(&self, line_idx: usize) -> String {
         let mut res: String = " ".to_string();
         let total_width = self.line_numb_col_width();
-        let line_numb = &line_idx.to_string();
+        let line_numb = &(line_idx + 1).to_string();
         res.push_str(line_numb);
         let right_padding_width = total_width - 3 - line_numb.len();
         for _ in 0..right_padding_width {
