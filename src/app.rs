@@ -5,11 +5,37 @@ use crate::{
 use ratatui::style::{Color, Style};
 use std::{
     char,
-    error::{self},
+    error::{self, Error},
     fmt::Display,
 };
 
-pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
+/// Soft errors that are displayed in the status line
+#[derive(Debug)]
+pub struct AppError {
+    severity: Flag,
+    message: String,
+}
+
+impl Display for AppError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl FlaggedText for AppError {
+    fn text(&self) -> String {
+        self.to_string()
+    }
+    fn flag(&self) -> Flag {
+        self.severity
+    }
+}
+
+impl Error for AppError {}
+
+pub type AppResult = std::result::Result<(), AppError>;
+
+pub type IoResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub enum Mode {
@@ -32,10 +58,10 @@ impl Display for Mode {
 impl Mode {
     pub fn color(&self) -> Style {
         match self {
-            Self::Normal => Style::default().fg(Color::White).bg(Color::DarkGray),
-            Self::GoTo => Style::default().fg(Color::White).bg(Color::DarkGray),
-            Self::Insert => Style::default().fg(Color::White).bg(Color::DarkGray),
-            Self::Delete => Style::default().fg(Color::White).bg(Color::DarkGray),
+            Self::Normal => Style::default().fg(Color::White).bg(Color::Blue),
+            Self::GoTo => Style::default().fg(Color::White).bg(Color::Black),
+            Self::Insert => Style::default().fg(Color::White).bg(Color::Green),
+            Self::Delete => Style::default().fg(Color::White).bg(Color::Red),
         }
     }
 }
@@ -77,6 +103,42 @@ pub struct App {
     logger: Logger,
     mode: Mode,
     cursor: Cursor,
+    messages: Vec<Message>,
+}
+
+#[derive(Debug, Default)]
+pub struct Message {
+    flag: Flag,
+    text: String,
+}
+
+impl Display for Message {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.text)
+    }
+}
+
+pub trait FlaggedText {
+    fn flag(&self) -> Flag;
+    fn text(&self) -> String;
+}
+
+impl<'a, T: FlaggedText> From<&'a T> for Message {
+    fn from(flagged_message: &'a T) -> Self {
+        Message {
+            flag: flagged_message.flag(),
+            text: flagged_message.text(),
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub enum Flag {
+    #[default]
+    Info,
+    Error,
+    Warning,
+    Success,
 }
 
 impl App {
@@ -111,9 +173,14 @@ impl App {
     fn set_running_state(&mut self, state: RunningState) {
         self.running_state = state
     }
-    #[allow(dead_code)]
     fn app_state(&self) -> &RunningState {
         &self.running_state
+    }
+    pub fn messages(&self) -> &Vec<Message> {
+        &self.messages
+    }
+    pub fn push_msg(&mut self, msg: Message) {
+        self.messages.push(msg)
     }
     pub fn buffer(&self) -> &Buffer {
         &self.buffer
@@ -139,9 +206,18 @@ impl App {
         let line_idx = self.scroll_pos();
         self.buffer.remove_line(line_idx);
     }
-    pub fn move_up(&mut self) {
-        if let Some(res) = self.cursor.y().checked_sub(1) {
-            self.cursor.set_y(res);
+    pub fn move_up(&mut self) -> Result<(), AppError> {
+        match self.cursor.y().checked_sub(1) {
+            Some(res) => {
+                self.cursor.set_y(res);
+                Ok(())
+            }
+            None => {
+                return Err(AppError {
+                    message: "already at top".to_string(),
+                    severity: Flag::Warning,
+                })
+            }
         }
     }
     pub fn move_down(&mut self) {
@@ -171,6 +247,8 @@ impl App {
         self.mode = mode
     }
     pub fn move_next_word_start(&mut self) {
+        // let line_idx = self.scroll_pos();
+        // let line = self.buffer().line(line_idx);
         // get line char idx of start of curr line
         // get char idx of pos
         // check if there is a next start of word
@@ -179,9 +257,18 @@ impl App {
         todo!()
     }
     pub fn move_start_line(&mut self) {
-        self.cursor.set_x(0);
+        let left_bound = self.buffer().line_numb_col_width();
+        self.cursor.set_x(left_bound);
     }
     pub fn move_end_line(&mut self) {
-        todo!()
+        let line_idx = self.scroll_pos();
+        let line = self.buffer().line(line_idx);
+        let chars_count = line.chars().count();
+        let left_bound = self.buffer().line_numb_col_width();
+        if chars_count == 0 {
+            self.cursor.set_x(left_bound)
+        } else {
+            self.cursor.set_x(left_bound + chars_count - 1)
+        }
     }
 }

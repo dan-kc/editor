@@ -1,10 +1,10 @@
 use editor::{
-    app::{self, AppResult, RunningState},
+    app::{self, IoResult, RunningState},
     buffer::Buffer,
     handler, tui,
 };
 
-fn main() -> AppResult<()> {
+fn main() -> IoResult<()> {
     let path = std::env::args().nth(1).expect("file name not found");
     let buffer = Buffer::from_file(&path).expect("could not find file");
     tui::install_panic_hook();

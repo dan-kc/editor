@@ -5,7 +5,7 @@ use ratatui::{
 
 use crate::app::App;
 
-use self::widgets::{CursorLine, GitSummary, Logs, LowerTextArea, StatusLine, UpperTextArea};
+use self::widgets::{CursorLine, GitSummary, MessageBlock, Logs, LowerTextArea, ModeBlock, UpperTextArea};
 
 mod widgets;
 
@@ -50,7 +50,16 @@ pub fn render(app: &App, frame: &mut Frame) {
         ])
         .split(window_layout[2]);
 
-    frame.render_widget(StatusLine::new(app.mode(), app.buffer()), outer_layout[1]);
+    let status_line_layout = Layout::default()
+        .direction(ratatui::layout::Direction::Horizontal)
+        .constraints(vec![
+            Constraint::Length(8), 
+            Constraint::Fill(1),
+        ])
+        .split(outer_layout[1]);
+
+    frame.render_widget(ModeBlock::new(app.mode()), status_line_layout[0]);
+    frame.render_widget(MessageBlock::new(app.messages().last()), status_line_layout[1]);
     frame.render_widget(GitSummary::new(app), upper_window_layout[0]);
     frame.render_widget(
         UpperTextArea::new(app.buffer(), app.scroll_pos()),

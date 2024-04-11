@@ -6,7 +6,7 @@ use std::{
 
 use chrono::{DateTime, Local};
 
-use crate::app::AppResult;
+use crate::app::IoResult;
 
 #[derive(Debug, Default)]
 pub struct Logger {
@@ -64,7 +64,7 @@ impl Logger {
         }
     }
 
-    pub fn write_to_file(&mut self) -> AppResult<()> {
+    pub fn write_to_file(&mut self) -> IoResult<()> {
         fs::create_dir_all(".local/share")?;
         let mut file = File::create(".local/share/dans-editor.log")?;
 

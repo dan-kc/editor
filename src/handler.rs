@@ -1,21 +1,23 @@
 use crate::{
-    app::{App, AppResult, Mode},
+    app::{App, AppResult, IoResult, Message, Mode},
     logger::Level,
 };
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-/// updates the application's state based on user input
 
-pub fn handle_events(app: &mut App) -> AppResult<()> {
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+
+pub fn handle_events(app: &mut App) -> IoResult<()> {
     match event::read()? {
         Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-            handle_key_events(key_event, app)?
+            if let Err(err) = handle_key_events(key_event, app) {
+                app.push_msg(Message::from(&err))
+            }
         }
         _ => {}
     };
     Ok(())
 }
 
-pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
+pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult {
     match app.mode() {
         Mode::Normal => handle_normal_mode_key_events(key_event, app)?,
         Mode::Insert => handle_insert_mode_key_events(key_event, app)?,
@@ -25,7 +27,7 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
     Ok(())
 }
 
-pub fn handle_normal_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
+pub fn handle_normal_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppResult {
     match key_event.code {
         KeyCode::Char('c') | KeyCode::Char('C') => {
             if key_event.modifiers == KeyModifiers::CONTROL {
@@ -42,7 +44,7 @@ pub fn handle_normal_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppR
             app.enter_mode(Mode::Delete);
         }
         KeyCode::Up => {
-            app.move_up();
+            app.move_up()?;
         }
         KeyCode::Down => {
             app.move_down();
@@ -59,15 +61,21 @@ pub fn handle_normal_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppR
         KeyCode::Char('w') => {
             app.move_next_word_start();
         }
+        KeyCode::Home => {
+            app.move_start_line();
+        }
+        KeyCode::End => {
+            app.move_end_line();
+        }
         _ => {}
     }
     Ok(())
 }
 
-pub fn handle_insert_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
+pub fn handle_insert_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppResult {
     match key_event.code {
         KeyCode::Up => {
-            app.move_up();
+            app.move_up()?;
         }
         KeyCode::Down => {
             app.move_down();
@@ -81,7 +89,7 @@ pub fn handle_insert_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppR
     Ok(())
 }
 
-pub fn handle_go_to_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
+pub fn handle_go_to_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppResult {
     match key_event.code {
         KeyCode::Char('g') => {
             app.move_to_top();
@@ -95,13 +103,14 @@ pub fn handle_go_to_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppRe
     Ok(())
 }
 
-pub fn handle_delete_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
+pub fn handle_delete_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppResult {
     match key_event.code {
         KeyCode::Char('d') => {
             app.delete_line();
-            app.logger_mut().log(Level::Info, String::from("deleted line"));
+            app.logger_mut()
+                .log(Level::Info, String::from("deleted line"));
             app.enter_mode(Mode::Normal);
-            app.move_up();
+            app.move_up()?;
         }
         KeyCode::Esc => {
             app.enter_mode(Mode::Normal);
