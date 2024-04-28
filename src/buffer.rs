@@ -37,21 +37,23 @@ impl FileReader for Rope {
 
 #[derive(Debug, Default)]
 pub struct Buffer {
-    file_name: String,
+    file_name: Box<str>,
     rope: Rope,
 }
 
 impl Buffer {
     // Create text buffer from file
-    pub fn from_file(file_name: &str) -> io::Result<Buffer> {
-        let rope = Rope::from_file(File::open(file_name)?)?;
+    pub fn from_file(file_name: String) -> io::Result<Buffer> {
+        let boxed_name: Box<str> = file_name.into();
+        let file = File::open(boxed_name.as_ref())?;
+        let rope = Rope::from_file(file)?;
         let buf = Buffer {
-            file_name: file_name.to_string(),
+            file_name: boxed_name,
             rope,
         };
         Ok(buf)
     }
-    pub fn file_name(&self) -> &String {
+    pub fn file_name(&self) -> &str {
         &self.file_name
     }
     /// Number of lines in buffer.
@@ -103,7 +105,7 @@ impl Buffer {
     }
     /// Byte index of cursor position
     pub fn byte_idx_of_cursor_pos(&self, cursor: &Cursor) -> Option<usize> {
-        self.byte_idx_of_char(cursor.y(), cursor.x())
+        self.byte_idx_of_char(cursor.y, cursor.x)
     }
     pub fn remove<R: RangeBounds<usize>>(&mut self, byte_range: R) {
         self.rope.delete(byte_range)

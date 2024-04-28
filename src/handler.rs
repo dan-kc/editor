@@ -29,11 +29,14 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult {
 
 pub fn handle_normal_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppResult {
     match key_event.code {
-        KeyCode::Char('c') | KeyCode::Char('C') => {
-            if key_event.modifiers == KeyModifiers::CONTROL {
-                app.quit();
-            }
-        }
+        KeyCode::Up => app.move_up()?,
+        KeyCode::Down => app.move_down()?,
+        KeyCode::Left => app.move_left()?,
+        KeyCode::Right => app.move_right()?,
+        KeyCode::Char('G') =>  app.move_to_bottom()?,
+        KeyCode::Char('w') =>  app.move_next_word_start()?,
+        KeyCode::Home => app.move_start_line()?,
+        KeyCode::End => app.move_end_line()?,
         KeyCode::Char('i') => {
             app.enter_mode(Mode::Insert);
         }
@@ -43,47 +46,22 @@ pub fn handle_normal_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppR
         KeyCode::Char('d') => {
             app.enter_mode(Mode::Delete);
         }
-        KeyCode::Up => {
-            app.move_up()?;
+        KeyCode::Char('c') | KeyCode::Char('C') => {
+            if key_event.modifiers == KeyModifiers::CONTROL {
+                app.quit();
+            }
         }
-        KeyCode::Down => {
-            app.move_down();
-        }
-        KeyCode::Left => {
-            app.move_left();
-        }
-        KeyCode::Right => {
-            app.move_right();
-        }
-        KeyCode::Char('G') => {
-            app.move_to_bottom();
-        }
-        KeyCode::Char('w') => {
-            app.move_next_word_start();
-        }
-        KeyCode::Home => {
-            app.move_start_line();
-        }
-        KeyCode::End => {
-            app.move_end_line();
-        }
-        _ => {}
+        _ => {},
     }
     Ok(())
 }
 
 pub fn handle_insert_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppResult {
     match key_event.code {
-        KeyCode::Up => {
-            app.move_up()?;
-        }
-        KeyCode::Down => {
-            app.move_down();
-        }
-        KeyCode::Char(char) => app.insert_char(char),
-        KeyCode::Esc => {
-            app.enter_mode(Mode::Normal);
-        }
+        KeyCode::Up => app.move_up()?,
+        KeyCode::Down => app.move_down()?,
+        KeyCode::Char(char) => app.insert_char(char)?,
+        KeyCode::Esc => app.enter_mode(Mode::Normal),
         _ => {}
     }
     Ok(())
@@ -92,21 +70,24 @@ pub fn handle_insert_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppR
 pub fn handle_go_to_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppResult {
     match key_event.code {
         KeyCode::Char('g') => {
-            app.move_to_top();
-            app.enter_mode(Mode::Normal)
+            app.enter_mode(Mode::Normal);
+            app.move_to_top()?;
+            Ok(())
         }
         KeyCode::Esc => {
             app.enter_mode(Mode::Normal);
+            Ok(())
         }
-        _ => {}
+        _ => {
+            Err(crate::app::AppError::KeyUnmapped)
+        }
     }
-    Ok(())
 }
 
 pub fn handle_delete_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppResult {
     match key_event.code {
         KeyCode::Char('d') => {
-            app.delete_line();
+            app.delete_line()?;
             app.logger_mut()
                 .log(Level::Info, String::from("deleted line"));
             app.enter_mode(Mode::Normal);

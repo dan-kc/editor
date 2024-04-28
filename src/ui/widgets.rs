@@ -1,5 +1,5 @@
 use crate::{
-    app::{App, AppError, Cursor, Message, Mode},
+    app::{App, Cursor, Message, Mode},
     buffer::Buffer,
     logger::Logger,
 };
@@ -203,7 +203,7 @@ impl<'a> Widget for CursorLine<'a> {
             area.width,
         );
         _ = buf.set_span(
-            area.x + self.cursor.x() as u16,
+            area.x + self.cursor.x as u16,
             area.y,
             &ratatui_cursor,
             area.width,
