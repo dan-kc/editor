@@ -18,7 +18,13 @@ src/
 
 ## TODO
 
+-- fix:insert mode not working
+
 -- W
 -- b, B
--- d2w builder pattern?
--- fix insert mode not working
+-- e, E
+
+-- some kind of text_area abstraction
+
+-- flesh out git stuff
+
