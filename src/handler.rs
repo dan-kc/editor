@@ -1,15 +1,14 @@
 use crate::{
-    app::{App, AppResult, IoResult, Message, Mode},
+    app::{App, IoResult, Mode, Notification, SoftResult},
     logger::Level,
 };
-
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 pub fn handle_events(app: &mut App) -> IoResult<()> {
     match event::read()? {
         Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
             if let Err(err) = handle_key_events(key_event, app) {
-                app.push_msg(Message::from(&err))
+                app.push_msg(Notification::from(&err))
             }
         }
         _ => {}
@@ -17,7 +16,7 @@ pub fn handle_events(app: &mut App) -> IoResult<()> {
     Ok(())
 }
 
-pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult {
+pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> SoftResult<()> {
     match app.mode() {
         Mode::Normal => handle_normal_mode_key_events(key_event, app)?,
         Mode::Insert => handle_insert_mode_key_events(key_event, app)?,
@@ -27,14 +26,14 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult {
     Ok(())
 }
 
-pub fn handle_normal_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppResult {
+pub fn handle_normal_mode_key_events(key_event: KeyEvent, app: &mut App) -> SoftResult<()> {
     match key_event.code {
         KeyCode::Up => app.move_up()?,
         KeyCode::Down => app.move_down()?,
         KeyCode::Left => app.move_left()?,
-        KeyCode::Right => app.move_right()?,
-        KeyCode::Char('G') =>  app.move_to_bottom()?,
-        KeyCode::Char('w') =>  app.move_next_word_start()?,
+        KeyCode::Right => app.move_right(),
+        KeyCode::Char('G') => app.move_to_bottom()?,
+        KeyCode::Char('w') => app.move_next_word_start()?,
         KeyCode::Home => app.move_start_line()?,
         KeyCode::End => app.move_end_line()?,
         KeyCode::Char('i') => {
@@ -51,12 +50,12 @@ pub fn handle_normal_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppR
                 app.quit();
             }
         }
-        _ => {},
+        _ => {}
     }
     Ok(())
 }
 
-pub fn handle_insert_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppResult {
+pub fn handle_insert_mode_key_events(key_event: KeyEvent, app: &mut App) -> SoftResult<()> {
     match key_event.code {
         KeyCode::Up => app.move_up()?,
         KeyCode::Down => app.move_down()?,
@@ -67,7 +66,7 @@ pub fn handle_insert_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppR
     Ok(())
 }
 
-pub fn handle_go_to_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppResult {
+pub fn handle_go_to_mode_key_events(key_event: KeyEvent, app: &mut App) -> SoftResult<()> {
     match key_event.code {
         KeyCode::Char('g') => {
             app.enter_mode(Mode::Normal);
@@ -78,13 +77,11 @@ pub fn handle_go_to_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppRe
             app.enter_mode(Mode::Normal);
             Ok(())
         }
-        _ => {
-            Err(crate::app::AppError::KeyUnmapped)
-        }
+        _ => Err(crate::app::SoftError::KeyUnmapped),
     }
 }
 
-pub fn handle_delete_mode_key_events(key_event: KeyEvent, app: &mut App) -> AppResult {
+pub fn handle_delete_mode_key_events(key_event: KeyEvent, app: &mut App) -> SoftResult<()> {
     match key_event.code {
         KeyCode::Char('d') => {
             app.delete_line()?;

@@ -1,5 +1,5 @@
 use crate::{
-    app::{App, Cursor, Message, Mode},
+    app::{App, Mode, Notification},
     buffer::Buffer,
     logger::Logger,
 };
@@ -32,11 +32,11 @@ impl<'a> Widget for GitSummary<'a> {
 }
 
 pub struct MessageBlock<'a> {
-    msg: Option<&'a Message>,
+    msg: Option<&'a Notification>,
 }
 
 impl<'a> MessageBlock<'a> {
-    pub fn new(msg: Option<&'a Message>) -> Self {
+    pub fn new(msg: Option<&'a Notification>) -> Self {
         MessageBlock { msg }
     }
 }
@@ -52,28 +52,29 @@ impl<'a> Widget for MessageBlock<'a> {
 
 pub struct UpperTextArea<'a> {
     buffer: &'a Buffer,
-    scroll_pos: usize,
 }
 
 impl<'a> UpperTextArea<'a> {
-    pub fn new(buffer: &'a Buffer, scroll_pos: usize) -> Self {
-        UpperTextArea { buffer, scroll_pos }
+    pub fn new(buffer: &'a Buffer) -> Self {
+        UpperTextArea { buffer }
     }
 }
 
 impl<'a> Widget for UpperTextArea<'a> {
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
+        let scroll_pos = self.buffer.cursor().y;
         // render line cols
         for i in 0..area.height {
-            let rope_idx = self.scroll_pos - area.height as usize + i as usize;
+            let rope_idx = scroll_pos - area.height as usize + i as usize;
             let line_numb = self.buffer.numb_col(rope_idx);
-            let ratatui_line = Span::raw(line_numb);
+            let ratatui_line = Span::raw(line_numb.to_string());
             _ = buf.set_span(area.x, area.y + i, &ratatui_line, area.width)
         }
 
         for i in 0..area.height {
-            let rope_idx = self.scroll_pos - area.height as usize + i as usize;
-            let line = self.buffer.line(rope_idx).populate_fill_chars(); // panics
+            let rope_idx = scroll_pos - area.height as usize + i as usize;
+            let line = self.buffer.line(rope_idx).to_string().populate_fill_chars();
+
             let ratatui_line = Span::raw(line);
             _ = buf.set_span(
                 self.buffer.line_numb_col_width() as u16 + area.x,
@@ -109,27 +110,28 @@ impl<'a> Widget for Logs<'a> {
 
 pub struct LowerTextArea<'a> {
     buffer: &'a Buffer,
-    scroll_pos: usize,
 }
 
 impl<'a> LowerTextArea<'a> {
-    pub fn new(buffer: &'a Buffer, scroll_pos: usize) -> Self {
-        LowerTextArea { buffer, scroll_pos }
+    pub fn new(buffer: &'a Buffer) -> Self {
+        LowerTextArea { buffer }
     }
 }
 
 impl<'a> Widget for LowerTextArea<'a> {
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
         // render line cols
+        let scroll_pos = self.buffer.cursor().y;
         for i in 0..area.height {
-            let rope_idx = self.scroll_pos + 1 + i as usize;
+            let rope_idx = scroll_pos + 1 + i as usize;
             let line_numb = self.buffer.numb_col(rope_idx);
-            let ratatui_line = Span::raw(line_numb);
+            let ratatui_line = Span::raw(line_numb.to_string());
             _ = buf.set_span(area.x, area.y + i, &ratatui_line, area.width)
         }
         for i in 0..area.height {
-            let rope_idx = self.scroll_pos + 1 + i as usize;
+            let rope_idx = scroll_pos + 1 + i as usize;
             let line = self.buffer.line(rope_idx).to_string().populate_fill_chars(); // panics
+
             let ratatui_line = Span::raw(line);
             _ = buf.set_span(
                 self.buffer.line_numb_col_width() as u16 + area.x,
@@ -165,37 +167,46 @@ impl<'a> Widget for ModeBlock<'a> {
 #[allow(dead_code)]
 pub struct CursorLine<'a> {
     buffer: &'a Buffer,
-    cursor: &'a Cursor,
-    scroll_pos: usize,
     mode: &'a Mode,
 }
 
 impl<'a> CursorLine<'a> {
-    pub fn new(buffer: &'a Buffer, cursor: &'a Cursor, scroll_pos: usize, mode: &'a Mode) -> Self {
-        CursorLine {
-            scroll_pos,
-            buffer,
-            cursor,
-            mode,
-        }
+    pub fn new(buffer: &'a Buffer, mode: &'a Mode) -> Self {
+        CursorLine { buffer, mode }
     }
 }
 
 impl<'a> Widget for CursorLine<'a> {
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
-        let scroll_pos = self.scroll_pos;
+        let scroll_pos = self.buffer.cursor().y;
+
         // render line cols
         let line_numb = self.buffer.numb_col(scroll_pos);
-        let ratatui_line = Span::raw(line_numb);
+        let ratatui_line = Span::raw(line_numb.to_string());
         _ = buf.set_span(area.x, area.y, &ratatui_line, area.width);
 
         let style = Style::default().fg(Color::White).bg(Color::Black);
-        let cursor_style = self.mode.color();
-        #[rustfmt::skip]
-        let line = self.buffer.line(scroll_pos).to_string().populate_fill_chars(); // panics
+
+        let mut cursor_char = self.buffer.char_under_cursor().unwrap_or(' ');
+        cursor_char = if cursor_char == '\n' {
+            ' '
+        } else {
+            cursor_char
+        };
+        let cursor_style = match self.buffer.strong_in_bounds() {
+            true => Style::default().fg(Color::White).bg(Color::Blue),
+            false => Style::default().fg(Color::White).bg(Color::Red),
+        };
+
+        let line = self
+            .buffer
+            .line(scroll_pos)
+            .to_string()
+            .populate_fill_chars();
         let ratatui_line = Span::styled(line.to_string(), style);
-        let ratatui_cursor = Span::styled(" ", cursor_style);
+        let ratatui_cursor = Span::styled(cursor_char.to_string(), cursor_style);
         buf.set_style(area, style);
+
         _ = buf.set_span(
             area.x + self.buffer.line_numb_col_width() as u16,
             area.y,
@@ -203,7 +214,7 @@ impl<'a> Widget for CursorLine<'a> {
             area.width,
         );
         _ = buf.set_span(
-            area.x + self.cursor.x as u16,
+            area.x + (self.buffer.line_numb_col_width() + self.buffer.cursor().x) as u16,
             area.y,
             &ratatui_cursor,
             area.width,

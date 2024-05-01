@@ -15,8 +15,7 @@ pub struct App {
     buffer: Buffer,
     logger: Logger,
     mode: Mode,
-    cursor: Cursor,
-    messages: Vec<Message>,
+    messages: Vec<Notification>,
 }
 
 impl App {
@@ -38,22 +37,16 @@ impl App {
     pub fn logger_mut(&mut self) -> &mut Logger {
         &mut self.logger
     }
-    pub fn cursor(&self) -> &Cursor {
-        &self.cursor
-    }
-    pub fn cursor_mut(&mut self) -> &mut Cursor {
-        &mut self.cursor
-    }
     pub fn running_state(&self) -> &RunningState {
         &self.running_state
     }
     pub fn running_state_mut(&mut self) -> &mut RunningState {
         &mut self.running_state
     }
-    pub fn messages(&self) -> &[Message] {
+    pub fn messages(&self) -> &[Notification] {
         self.messages.as_slice()
     }
-    pub fn push_msg(&mut self, msg: Message) {
+    pub fn push_msg(&mut self, msg: Notification) {
         self.messages.push(msg)
     }
     pub fn buffer(&self) -> &Buffer {
@@ -65,117 +58,170 @@ impl App {
     pub fn quit(&mut self) {
         self.running_state = RunningState::Done
     }
-    pub fn scroll_pos(&self) -> usize {
-        self.cursor.y
+    pub fn char_under_cursor(&self) -> Option<char> {
+        todo!()
     }
-    pub fn insert_char(&mut self, char: char) -> AppResult {
+    pub fn byte_under_cursor(&self) -> Option<u8> {
+        todo!()
+    }
+    pub fn insert_char(&mut self, char: char) -> SoftResult<()> {
         let byte_idx = self
             .buffer()
-            .byte_idx_of_cursor_pos(self.cursor())
+            .byte_idx_under_cursor()
             .expect("out of bounds");
         self.buffer.insert(byte_idx, char.to_string());
-        self.move_right()?;
+        self.move_right();
         Ok(())
     }
-    pub fn delete_line(&mut self) -> AppResult {
-        if self.scroll_pos() == 0 {
-            return Err(AppError::NoLinesLeft);
+    pub fn delete_line(&mut self) -> SoftResult<()> {
+        if self.buffer().lines_count() == 0 {
+            return Err(SoftError::NoLinesLeft);
         }
-        let line_idx = self.scroll_pos();
+        let line_idx = self.buffer().cursor().y;
         self.buffer.remove_line(line_idx);
         Ok(())
     }
-    pub fn move_up(&mut self) -> AppResult {
-        self.cursor
+    pub fn move_up(&mut self) -> SoftResult<()> {
+        self.buffer()
+            .cursor()
             .y
             .checked_sub(1)
-            .ok_or(AppError::OutOfBounds(Direction::Down))
+            .ok_or(SoftError::OutOfBounds(Direction::Up))
             .map(|y_pos| {
-                self.cursor.y = y_pos;
+                self.buffer_mut().cursor_mut().y = y_pos;
             })
     }
-    pub fn move_down(&mut self) -> AppResult {
-        let cursor_on_last_line = self.buffer.len_lines() == self.scroll_pos() + 1;
+    pub fn move_down(&mut self) -> SoftResult<()> {
+        let cursor_on_last_line = self.buffer.lines_count() == self.buffer().cursor().y + 1;
         if cursor_on_last_line {
-            return Err(AppError::OutOfBounds(Direction::Down));
+            return Err(SoftError::OutOfBounds(Direction::Down));
         };
         let y_pos = self
-            .cursor
+            .buffer()
+            .cursor()
             .y
             .checked_add(1)
             .expect("y cursor value overflow");
-        self.cursor.y = y_pos;
+        self.buffer_mut().cursor_mut().y = y_pos;
         Ok(())
     }
-    pub fn move_left(&mut self) -> AppResult {
-        self.cursor
+    pub fn move_left(&mut self) -> SoftResult<()> {
+        self.buffer()
+            .cursor()
             .x
             .checked_sub(1)
-            .ok_or(AppError::OutOfBounds(Direction::Left))
+            .ok_or(SoftError::OutOfBounds(Direction::Left))
             .map(|x_pos| {
-                self.cursor.x = x_pos;
+                self.buffer_mut().cursor_mut().x = x_pos;
             })
     }
-    pub fn move_right(&mut self) -> AppResult {
-        self.cursor
+    pub fn move_right(&mut self) {
+        let x_pos = self
+            .buffer()
+            .cursor()
             .x
             .checked_add(1)
-            .ok_or(AppError::OutOfBounds(Direction::Right))
-            .map(|x_pos| {
-                self.cursor.x = x_pos;
-            })
+            .expect("x cursor value overflow");
+
+        self.buffer_mut().cursor_mut().x = x_pos;
     }
-    pub fn move_to_top(&mut self) -> AppResult {
-        if self.cursor.y == 0 {
-            return Err(AppError::AlreadyAtTop);
+    pub fn move_to_top(&mut self) -> SoftResult<()> {
+        if self.buffer().cursor().y == 0 {
+            return Err(SoftError::AlreadyAtTop);
         }
-        self.cursor.y = 0;
+        self.buffer_mut().cursor_mut().y = 0;
         Ok(())
     }
-    pub fn move_to_bottom(&mut self) -> AppResult {
-        if self.cursor.y == 0 {
-            return Err(AppError::AlreadyAtBottom);
+    pub fn move_to_bottom(&mut self) -> SoftResult<()> {
+        if self.buffer().is_empty() {
+            return Err(SoftError::BufferEmpty);
         }
-        self.cursor.y = self.buffer.len_lines() - 1;
+        if self.buffer().cursor().y + 1 == self.buffer().lines_count() {
+            return Err(SoftError::AlreadyAtBottom);
+        }
+        self.buffer_mut().cursor_mut().y = self.buffer.lines_count() - 1;
         Ok(())
     }
     pub fn enter_mode(&mut self, mode: Mode) {
         self.mode = mode
     }
-    pub fn move_next_word_start(&mut self) -> AppResult {
-        // let line_idx = self.scroll_pos();
-        // let line = self.buffer().line(line_idx);
-        // get line char idx of start of curr line
-        // get char idx of pos
-        // check if there is a next start of word
-        // if not, return err
-        // if so, then move to that char idx
-        todo!()
-    }
-    pub fn move_start_line(&mut self) -> AppResult {
-        let left_bound = self.buffer().line_numb_col_width();
-        if self.cursor.x == left_bound {
-            return Err(AppError::NoMoreWordsInLine);
+    pub fn move_next_word_start(&mut self) -> SoftResult<()> {
+        if !self.buffer().in_bounds() {
+            return Err(SoftError::CursorOutOfBounds)
+        };
+        let cursor = self.buffer().cursor();
+        let line_idx = cursor.y;
+        let line = self.buffer().line(line_idx);
+
+        // Branch, first char is whitespace or not
+        let mut chars = line.chars().skip(cursor.x).enumerate();
+        let first_char = match chars.next() {
+            None => return Err(SoftError::NoMoreWordsInLine),
+            Some(c) => c,
         }
-        self.cursor.x = left_bound;
+        .1;
+
+        let mut next_loc = cursor.x;
+        if first_char.is_whitespace() {
+            for char in chars.by_ref() {
+                let char = char.1;
+                next_loc += 1;
+                if !char.is_whitespace() {
+                    self.buffer_mut().cursor_mut().x = next_loc;
+                    return Ok(());
+                }
+            }
+            return Err(SoftError::NoMoreWordsInLine);
+        };
+
+        // Find whitespace
+        for char in chars.by_ref() {
+            let char = char.1;
+            next_loc += 1;
+            if char.is_whitespace() {
+                // We're on a whitespace
+                break;
+            }
+        }
+
+        // Find non_whitespace
+        for char in chars.by_ref() {
+            let char = char.1;
+            next_loc += 1;
+            if !char.is_whitespace() {
+                self.buffer_mut().cursor_mut().x = next_loc;
+                return Ok(());
+            }
+        }
+
+        Err(SoftError::NoMoreWordsInLine)
+    }
+    pub fn move_start_line(&mut self) -> SoftResult<()> {
+        let line_idx = self.buffer().cursor().y;
+        if self.buffer().line_empty(line_idx) {
+            self.buffer_mut().cursor_mut().x = 0;
+            return Err(SoftError::NoCharactersInLine);
+        };
+        if self.buffer().cursor().x == 0 {
+            return Err(SoftError::AlreadyAtLineStart);
+        }
+
+        self.buffer_mut().cursor_mut().x = 0;
         Ok(())
     }
-    pub fn move_end_line(&mut self) -> AppResult {
-        let line_idx = self.scroll_pos();
-        let line = self.buffer().line(line_idx);
-        let chars_count = line.chars().count();
-        let left_bound = self.buffer().line_numb_col_width();
-        if chars_count == 0 {
-            if self.cursor.x == chars_count {
-                return Err(AppError::AlreadyAtLineEnd);
-            };
-            self.cursor.x = left_bound;
-        } else {
-            if self.cursor.x == left_bound + chars_count - 1 {
-                return Err(AppError::AlreadyAtLineEnd);
-            };
-            self.cursor.x = left_bound + chars_count - 1
+    /// Move to the end of the current line. If there are no chars, then move to (0,0).
+    pub fn move_end_line(&mut self) -> SoftResult<()> {
+        let line_idx = self.buffer().cursor().y;
+        if self.buffer().line_empty(line_idx) {
+            self.buffer_mut().cursor_mut().x = 0;
+            return Err(SoftError::NoCharactersInLine);
+        };
+        let char_count = self.buffer().line(line_idx).chars().count();
+        if self.buffer().cursor().x == char_count - 1 {
+            return Err(SoftError::AlreadyAtLineEnd);
         }
+
+        self.buffer_mut().cursor_mut().x = char_count - 1;
         Ok(())
     }
 }
@@ -200,7 +246,7 @@ impl Display for Direction {
 
 /// Soft errors that are displayed in the status line
 #[derive(Debug)]
-pub enum AppError {
+pub enum SoftError {
     OutOfBounds(Direction),
     NoLinesLeft,
     KeyUnmapped,
@@ -209,9 +255,13 @@ pub enum AppError {
     NoMoreWordsInLine,
     AlreadyAtLineStart,
     AlreadyAtLineEnd,
+    NoCharactersInLine,
+    LineDoesNotExist,
+    CursorOutOfBounds,
+    BufferEmpty,
 }
-impl Error for AppError {}
-impl Display for AppError {
+impl Error for SoftError {}
+impl Display for SoftError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::OutOfBounds(dir) => {
@@ -238,11 +288,23 @@ impl Display for AppError {
             Self::AlreadyAtLineEnd => {
                 write!(f, "Already at line end")
             }
+            Self::NoCharactersInLine => {
+                write!(f, "No characters in line")
+            }
+            Self::LineDoesNotExist => {
+                write!(f, "Line does no exist")
+            }
+            Self::CursorOutOfBounds => {
+                write!(f, "Cursor out of bounds")
+            }
+            Self::BufferEmpty => {
+                write!(f, "Buffer is empty")
+            }
         }
     }
 }
 
-pub type AppResult = std::result::Result<(), AppError>;
+pub type SoftResult<T> = std::result::Result<T, SoftError>;
 pub type IoResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -272,12 +334,6 @@ impl Mode {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct Cursor {
-    pub x: usize,
-    pub y: usize,
-}
-
 #[derive(Debug, Default, PartialEq)]
 pub enum RunningState {
     #[default]
@@ -286,35 +342,39 @@ pub enum RunningState {
 }
 
 #[derive(Debug, Default)]
-pub struct Message {
-    message_type: MessageType,
+pub struct Notification {
+    message_type: NotificationType,
     text: Box<str>,
 }
 
-impl Display for Message {
+impl Display for Notification {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let icon = match self.message_type {
-            MessageType::Info => "󰬐",
-            MessageType::Error => "",
-            MessageType::Warning => "",
-            MessageType::Success => "",
+            NotificationType::Info => "󰬐",
+            NotificationType::Error => "",
+            NotificationType::Warning => "",
+            NotificationType::Success => "",
         };
         write!(f, "{} {}", icon, self.text)
     }
 }
-impl From<&AppError> for Message {
-    fn from(err: &AppError) -> Self {
+impl From<&SoftError> for Notification {
+    fn from(err: &SoftError) -> Self {
         let message_type = match err {
-            AppError::OutOfBounds(_) => MessageType::Warning,
-            AppError::NoLinesLeft => MessageType::Warning,
-            AppError::KeyUnmapped => MessageType::Warning,
-            AppError::AlreadyAtTop => MessageType::Warning,
-            AppError::AlreadyAtBottom => MessageType::Warning,
-            AppError::NoMoreWordsInLine => MessageType::Warning,
-            AppError::AlreadyAtLineEnd => MessageType::Warning,
-            AppError::AlreadyAtLineStart => MessageType::Warning,
+            SoftError::OutOfBounds(_) => NotificationType::Warning,
+            SoftError::NoLinesLeft => NotificationType::Warning,
+            SoftError::KeyUnmapped => NotificationType::Warning,
+            SoftError::AlreadyAtTop => NotificationType::Warning,
+            SoftError::AlreadyAtBottom => NotificationType::Warning,
+            SoftError::NoMoreWordsInLine => NotificationType::Warning,
+            SoftError::AlreadyAtLineEnd => NotificationType::Warning,
+            SoftError::AlreadyAtLineStart => NotificationType::Warning,
+            SoftError::NoCharactersInLine => NotificationType::Warning,
+            SoftError::LineDoesNotExist => NotificationType::Error,
+            SoftError::CursorOutOfBounds => NotificationType::Warning,
+            SoftError::BufferEmpty => NotificationType::Warning,
         };
-        Message {
+        Notification {
             message_type,
             text: err.to_string().into(),
         }
@@ -322,10 +382,236 @@ impl From<&AppError> for Message {
 }
 
 #[derive(Debug, Default, Clone, Copy)]
-pub enum MessageType {
+pub enum NotificationType {
     #[default]
     Info,
     Error,
     Warning,
     Success,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    enum MockFile {
+        Basic,
+        Empty,
+        Sparse,
+    }
+
+    fn init(file: MockFile) -> App {
+        let file_name: String = match file {
+            MockFile::Basic => "tests/mocks/basic.txt".into(),
+            MockFile::Empty => "tests/mocks/empty.txt".into(),
+            MockFile::Sparse => "tests/mocks/sparse.txt".into(),
+        };
+
+        let buffer = Buffer::from_file(file_name).unwrap();
+        App::new(buffer)
+    }
+
+    #[test]
+    fn test_move_right() {
+        let mut app = init(MockFile::Basic);
+
+        app.move_right();
+        app.move_right();
+        assert_eq!(app.buffer().cursor().x, 2);
+    }
+
+    #[test]
+    fn test_move_down() {
+        let mut app = init(MockFile::Basic);
+
+        app.move_down().unwrap();
+        app.move_down().unwrap();
+        assert_eq!(app.buffer().cursor().y, 2);
+    }
+
+    #[test]
+    fn test_fail_move_down() {
+        let mut app = init(MockFile::Sparse);
+
+        app.move_down().unwrap();
+        app.move_down().unwrap();
+        app.move_down().unwrap();
+        assert!(matches!(
+            app.move_down(),
+            Err(SoftError::OutOfBounds(Direction::Down))
+        ));
+        assert_eq!(app.buffer().cursor().y, 3);
+    }
+
+    #[test]
+    fn test_move_up() {
+        let mut app = init(MockFile::Basic);
+
+        app.move_down().unwrap();
+        app.move_down().unwrap();
+        app.move_up().unwrap();
+        assert_eq!(app.buffer().cursor().y, 1);
+    }
+
+    #[test]
+    fn test_fail_move_up() {
+        let mut app = init(MockFile::Basic);
+
+        assert!(matches!(
+            app.move_up(),
+            Err(SoftError::OutOfBounds(Direction::Up))
+        ));
+        assert_eq!(app.buffer().cursor().y, 0);
+    }
+
+    #[test]
+    fn test_move_left() {
+        let mut app = init(MockFile::Basic);
+
+        app.move_right();
+        app.move_left().unwrap();
+        assert_eq!(app.buffer().cursor().x, 0);
+    }
+
+    #[test]
+    fn test_fail_move_left() {
+        let mut app = init(MockFile::Basic);
+
+        assert!(matches!(
+            app.move_left(),
+            Err(SoftError::OutOfBounds(Direction::Left))
+        ));
+        assert_eq!(app.buffer().cursor().x, 0);
+    }
+
+    #[test]
+    fn test_move_end_of_line() {
+        let mut app = init(MockFile::Basic);
+
+        app.move_end_line().unwrap();
+        assert_eq!(app.buffer().cursor().x, 33);
+    }
+
+    #[test]
+    fn test_fail_move_end_of_line() {
+        let mut app = init(MockFile::Sparse);
+
+        app.move_end_line().unwrap();
+        assert!(matches!(
+            app.move_end_line(),
+            Err(SoftError::AlreadyAtLineEnd)
+        ));
+        assert_eq!(app.buffer().cursor().x, 2);
+
+        app.move_down().unwrap();
+        assert!(matches!(
+            app.move_end_line(),
+            Err(SoftError::NoCharactersInLine)
+        ));
+        assert_eq!(app.buffer().cursor().x, 0);
+    }
+
+    #[test]
+    fn test_move_start_of_line() {
+        let mut app = init(MockFile::Basic);
+
+        app.move_right();
+        app.move_right();
+        app.move_start_line().unwrap();
+        assert_eq!(app.buffer().cursor().x, 0);
+    }
+
+    #[test]
+    fn test_fail_move_start_of_line() {
+        let mut app = init(MockFile::Basic);
+
+        assert!(matches!(
+            app.move_start_line(),
+            Err(SoftError::AlreadyAtLineStart)
+        ));
+        assert_eq!(app.buffer().cursor().x, 0);
+
+        app.move_down().unwrap();
+        app.move_down().unwrap();
+        app.move_right();
+        assert!(matches!(
+            app.move_start_line(),
+            Err(SoftError::NoCharactersInLine)
+        ));
+        assert_eq!(app.buffer().cursor().x, 0);
+    }
+
+    #[test]
+    fn test_move_to_bottom() {
+        let mut app = init(MockFile::Basic);
+
+        app.move_to_bottom().unwrap();
+        assert_eq!(app.buffer().cursor().y, 6);
+    }
+
+    #[test]
+    fn test_fail_move_to_bottom() {
+        let mut app = init(MockFile::Sparse);
+
+        app.move_down().unwrap();
+        app.move_down().unwrap();
+        app.move_down().unwrap();
+        assert!(matches!(
+            app.move_to_bottom(),
+            Err(SoftError::AlreadyAtBottom)
+        ));
+        assert_eq!(app.buffer().cursor().y, 3)
+    }
+
+    #[test]
+    fn test_move_to_top() {
+        let mut app = init(MockFile::Basic);
+
+        app.move_down().unwrap();
+        app.move_down().unwrap();
+        app.move_to_top().unwrap();
+        assert_eq!(app.buffer().cursor().y, 0);
+    }
+
+    #[test]
+    fn test_fail_move_to_top() {
+        let mut app = init(MockFile::Basic);
+
+        assert!(matches!(app.move_to_top(), Err(SoftError::AlreadyAtTop)));
+        assert_eq!(app.buffer().cursor().y, 0);
+    }
+
+    #[test]
+    fn test_move_next_word_start() {
+        let mut app = init(MockFile::Basic);
+
+        app.move_next_word_start().unwrap();
+        assert_eq!(app.buffer().cursor().x, 10);
+
+        // from whitespace
+        app.move_left().unwrap();
+        app.move_next_word_start().unwrap();
+        assert_eq!(app.buffer().cursor().x, 10);
+    }
+
+    #[test]
+    fn test_fail_move_next_word_start() {
+        let mut app = init(MockFile::Sparse);
+
+        assert!(matches!(
+            app.move_next_word_start(),
+            Err(SoftError::NoMoreWordsInLine)
+        ));
+        assert_eq!(app.buffer().cursor().x, 0);
+
+        app.move_right();
+        app.move_right();
+        app.move_right();
+        app.move_right();
+        assert!(matches!(
+            app.move_next_word_start(),
+            Err(SoftError::CursorOutOfBounds)
+        ));
+        assert_eq!(app.buffer().cursor().x, 4);
+    }
 }

@@ -1,4 +1,7 @@
-use crate::{app::{App, IoResult}, ui};
+use crate::{
+    app::{App, IoResult},
+    ui,
+};
 use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
 use ratatui::{
     backend::{Backend, CrosstermBackend},

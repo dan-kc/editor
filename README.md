@@ -18,4 +18,6 @@ src/
 
 ## TODO
 
--- More motions
+-- W
+-- b, B
+-- d2w builder pattern?
