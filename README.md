@@ -21,3 +21,4 @@ src/
 -- W
 -- b, B
 -- d2w builder pattern?
+-- fix insert mode not working
