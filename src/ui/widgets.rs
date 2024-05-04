@@ -12,6 +12,7 @@ use ratatui::{
 };
 use std::usize;
 
+#[allow(dead_code)]
 pub struct GitSummary<'a> {
     app: &'a App,
 }

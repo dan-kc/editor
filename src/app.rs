@@ -217,7 +217,7 @@ impl App {
         let words = self.buffer().words(start..end);
         let word_idx = match words.first() {
             Some(word) => {
-                if word.chars.len() == 1{
+                if word.chars.len() == 1 {
                     1
                 } else {
                     0
@@ -250,7 +250,7 @@ impl App {
         let words = self.buffer().words_long(start..end);
         let word_idx = match words.first() {
             Some(word) => {
-                if word.chars.len() == 1{
+                if word.chars.len() == 1 {
                     1
                 } else {
                     0
@@ -258,7 +258,6 @@ impl App {
             }
             None => return Err(SoftError::CursorOutOfBounds),
         };
-
 
         match words.get(word_idx) {
             None => Err(SoftError::NoMoreWordsInLine),
@@ -285,7 +284,7 @@ impl App {
         self.buffer_mut().cursor_mut().x = 0;
         Ok(())
     }
-    /// Move to the end of the current line. If there are no chars, then move to (0,0).
+    /// Move to the last non-newline char of the current line. If there are no chars, then move to (0,0).
     pub fn move_end_line(&mut self) -> SoftResult<()> {
         let line_idx = self.buffer().cursor().y;
         if self.buffer().line_empty(line_idx) {
@@ -470,6 +469,7 @@ pub enum NotificationType {
 mod tests {
     use super::*;
 
+    #[allow(dead_code)]
     enum MockFile {
         Basic,
         Empty,
@@ -824,5 +824,45 @@ mod tests {
             app.move_next_word_end_long(),
             Err(SoftError::CursorOutOfBounds)
         ));
+    }
+    #[test]
+    fn test_insert_text() {
+        let mut app = init(MockFile::Sparse);
+
+        app.insert_char('t').unwrap();
+        app.insert_char('e').unwrap();
+        assert_eq!(app.buffer().char_under_cursor().unwrap(), 'P');
+
+        app.move_left().unwrap();
+        assert_eq!(app.buffer().char_under_cursor().unwrap(), 'e');
+
+        app.move_left().unwrap();
+        assert_eq!(app.buffer().char_under_cursor().unwrap(), 't');
+
+        app.move_right();
+        assert_eq!(app.buffer().char_under_cursor().unwrap(), 'e');
+
+        app.move_end_line().unwrap();
+        app.move_right();
+        app.insert_char('s').unwrap();
+        app.insert_char('t').unwrap();
+        assert_eq!(app.buffer().char_under_cursor().unwrap(), '\n');
+
+        app.move_left().unwrap();
+        assert_eq!(app.buffer().char_under_cursor().unwrap(), 't');
+
+        app.move_left().unwrap();
+        assert_eq!(app.buffer().char_under_cursor().unwrap(), 's');
+
+        let mut app = init(MockFile::Empty);
+        app.insert_char('s').unwrap();
+        app.insert_char('t').unwrap();
+        assert_eq!(app.buffer().char_under_cursor().unwrap(), '\n');
+
+        app.move_left().unwrap();
+        assert_eq!(app.buffer().char_under_cursor().unwrap(), 't');
+
+        app.move_left().unwrap();
+        assert_eq!(app.buffer().char_under_cursor().unwrap(), 's');
     }
 }

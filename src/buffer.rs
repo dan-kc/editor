@@ -50,7 +50,7 @@ impl Buffer {
         self.rope.line(idx)
     }
     pub fn is_empty(&self) -> bool {
-        self.rope.is_empty()
+        self.rope.byte_len() == 1
     }
     /// Byte index of first byte in line.
     pub fn byte_idx_of_line_start(&self, line_idx: usize) -> usize {
@@ -74,7 +74,7 @@ impl Buffer {
     pub fn byte_idx_under_cursor(&self) -> Option<usize> {
         let cursor = self.cursor;
         let line = self.line(cursor.y);
-        let mut byte_idx = 0;
+        let mut byte_idx = self.byte_idx_of_line_start(cursor.y);
         for (i, c) in line.chars().enumerate() {
             if i == cursor.x {
                 return Some(byte_idx);
@@ -323,7 +323,9 @@ impl FileReader for Rope {
         let mut rope_builder = RopeBuilder::new();
 
         let mut lines = reader.lines().peekable();
+        let mut is_empty = true;
         while let Some(line_result) = lines.next() {
+            is_empty = false;
             let line = line_result?;
             match std::str::from_utf8(line.as_bytes()) {
                 Ok(utf8_str) => {
@@ -338,6 +340,9 @@ impl FileReader for Rope {
                     return Err(io::Error::new(io::ErrorKind::InvalidData, error_msg));
                 }
             };
+        }
+        if is_empty {
+            rope_builder.append('\n'.to_string());
         }
         Ok(rope_builder.build())
     }
