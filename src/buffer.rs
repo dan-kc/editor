@@ -56,7 +56,7 @@ impl Buffer {
     pub fn byte_idx_of_line_start(&self, line_idx: usize) -> usize {
         self.rope.byte_of_line(line_idx)
     }
-    /// Byte index of last byte in line.
+    /// Byte index of last byte in line. usually \n
     pub fn byte_idx_of_line_end(&self, line_idx: usize) -> usize {
         let result = panic::catch_unwind(|| self.rope.byte_of_line(line_idx + 1));
         match result {
@@ -92,7 +92,7 @@ impl Buffer {
         }
     }
     pub fn char_under_cursor(&self) -> Option<char> {
-        if !self.in_bounds() {
+        if !self.in_rope_bounds() {
             return None;
         };
 
@@ -110,10 +110,12 @@ impl Buffer {
 
         None
     }
-    pub fn in_bounds(&self) -> bool {
+    /// Is the cursor currently in bounds of the rope. \n is in bounds
+    pub fn in_rope_bounds(&self) -> bool {
         self.byte_idx_under_cursor().is_some()
     }
-    pub fn strong_in_bounds(&self) -> bool {
+    /// Is the cursor currently in bounds of line. \n is out of bounds
+    pub fn in_bounds(&self) -> bool {
         match self.char_under_cursor() {
             Some(char) => char != '\n',
             None => false,
@@ -148,6 +150,167 @@ impl Buffer {
     /// left margin + right margin + border = 3
     pub fn line_numb_col_width(&self) -> usize {
         self.lines_count().to_string().len() + 3
+    }
+    pub fn words<T: RangeBounds<usize>>(&self, byte_range: T) -> Box<[Word]> {
+        let mut byte_idx = match byte_range.start_bound() {
+            std::ops::Bound::Included(val) => *val,
+            std::ops::Bound::Excluded(val) => *val + 1,
+            std::ops::Bound::Unbounded => 0,
+        };
+        let rope_slice = self.rope.byte_slice(byte_range);
+        let chars = rope_slice.chars();
+        let mut words = Vec::new();
+        let mut curr_chars = Vec::new();
+        let mut char_idx = self.cursor().x ;
+        let mut last_len: Option<usize> = None;
+
+        for char in chars {
+            let char = Char {
+                char,
+                byte_idx,
+                char_idx,
+            };
+            char_idx += 1;
+            byte_idx += char.char.len_utf8();
+            last_len = Some(char.char.len_utf8());
+
+            let curr_type = char.classify();
+            let prev_type = curr_chars.last().map(|char: &Char| char.classify());
+
+            let same_type_as_prev = match prev_type {
+                Some(t) => t == curr_type,
+                None => false,
+            };
+            let is_empty = curr_chars.is_empty();
+            if same_type_as_prev {
+                curr_chars.push(char);
+                continue;
+            };
+            // types differ from this point
+            if is_empty && curr_type == CharType::Whitespace {
+                continue;
+            }
+            if is_empty && curr_type != CharType::Whitespace {
+                curr_chars.push(char);
+                continue;
+            }
+            // curr_chars non empty at this point
+            let byte_len = curr_chars
+                .iter()
+                .fold(0, |acc, char| acc + char.char.len_utf8());
+            let word = Word {
+                chars: curr_chars.into_boxed_slice(),
+                byte_len,
+            };
+            if curr_type == CharType::Whitespace {
+                words.push(word);
+                curr_chars = Vec::new();
+            } else {
+                words.push(word);
+                curr_chars = vec![char];
+            };
+        }
+        if !curr_chars.is_empty() && last_len.is_some() {
+            let byte_len = curr_chars
+                .iter()
+                .fold(0, |acc, char| acc + char.char.len_utf8());
+            let word = Word {
+                chars: curr_chars.into_boxed_slice(),
+                byte_len,
+            };
+            words.push(word);
+        };
+        words.into_boxed_slice()
+    }
+    pub fn words_long<T: RangeBounds<usize>>(&self, byte_range: T) -> Box<[Word]> {
+        let mut byte_idx = match byte_range.start_bound() {
+            std::ops::Bound::Included(val) => *val,
+            std::ops::Bound::Excluded(val) => *val + 1,
+            std::ops::Bound::Unbounded => 0,
+        };
+        let rope_slice = self.rope.byte_slice(byte_range);
+        let chars = rope_slice.chars();
+        let mut words = Vec::new();
+        let mut curr_chars = Vec::new();
+        let mut char_idx = self.cursor().x;
+        let mut last_len: Option<usize> = None;
+
+        for char in chars {
+            let char = Char {
+                char,
+                byte_idx,
+                char_idx,
+            };
+            char_idx += 1;
+            byte_idx += char.char.len_utf8();
+            last_len = Some(char.char.len_utf8());
+
+            let is_empty = curr_chars.is_empty();
+            if !char.char.is_whitespace() {
+                curr_chars.push(char);
+                continue;
+            }
+            if is_empty {
+                continue;
+            };
+
+            let byte_len = curr_chars
+                .iter()
+                .fold(0, |acc, char| acc + char.char.len_utf8());
+            let word = Word {
+                chars: curr_chars.into_boxed_slice(),
+                byte_len,
+            };
+            words.push(word);
+            curr_chars = Vec::new();
+        }
+        if !curr_chars.is_empty() && last_len.is_some() {
+            let byte_len = curr_chars
+                .iter()
+                .fold(0, |acc, char| acc + char.char.len_utf8());
+            let word = Word {
+                chars: curr_chars.into_boxed_slice(),
+                byte_len,
+            };
+            words.push(word);
+        };
+        words.into_boxed_slice()
+    }
+}
+
+#[derive(Eq, PartialEq, Copy, Clone)]
+enum CharType {
+    Letter,
+    Number,
+    Punctuation,
+    Whitespace,
+}
+
+#[derive(Debug)]
+pub struct Word {
+    pub chars: Box<[Char]>,
+    pub byte_len: usize,
+}
+
+#[derive(Debug)]
+pub struct Char {
+    pub char: char,
+    pub byte_idx: usize, // of entire rope
+    pub char_idx: usize, // of specified range
+}
+
+impl Char {
+    fn classify(&self) -> CharType {
+        let c = self.char;
+        if c.is_whitespace() {
+            CharType::Whitespace
+        } else if c.is_ascii_punctuation() {
+            CharType::Punctuation
+        } else if c.is_numeric() {
+            CharType::Number
+        } else {
+            CharType::Letter
+        }
     }
 }
 
@@ -235,8 +398,8 @@ mod tests {
         assert_eq!(buffer.byte_idx_under_cursor().unwrap(), 12);
 
         buffer.cursor_mut().y = 0;
-        buffer.cursor_mut().x = 33;
-        assert_eq!(buffer.byte_idx_under_cursor().unwrap(), 36);
+        buffer.cursor_mut().x = 34;
+        assert_eq!(buffer.byte_idx_under_cursor().unwrap(), 37); // \n
     }
     #[test]
     fn test_char_under_cursor() {
@@ -246,17 +409,13 @@ mod tests {
         buffer.cursor_mut().x = 18;
         assert_eq!(buffer.char_under_cursor().unwrap(), 'd');
 
-        buffer.cursor_mut().y = 6;
-        buffer.cursor_mut().x = 17;
-        assert_eq!(buffer.char_under_cursor().unwrap(), 's');
-
-        buffer.cursor_mut().y = 3;
+        buffer.cursor_mut().y = 0;
         buffer.cursor_mut().x = 34;
         assert_eq!(buffer.char_under_cursor().unwrap(), '\n');
 
-        buffer.cursor_mut().y = 6;
-        buffer.cursor_mut().x = 54;
-        assert_eq!(buffer.char_under_cursor().unwrap(), '.');
+        buffer.cursor_mut().y = 2;
+        buffer.cursor_mut().x = 0;
+        assert_eq!(buffer.char_under_cursor().unwrap(), '\n');
     }
     #[test]
     fn test_fail_char_under_cursor() {
@@ -270,8 +429,16 @@ mod tests {
         buffer.cursor_mut().x = 1;
         assert!(buffer.char_under_cursor().is_none());
 
-        buffer.cursor_mut().y = 6;
-        buffer.cursor_mut().x = 55;
+        buffer.cursor_mut().y = 3;
+        buffer.cursor_mut().x = 34;
         assert!(buffer.char_under_cursor().is_none());
     }
+    // #[test]
+    // fn test_x_char_offset() {
+    //     let mut buffer = init(MockFile::Basic);
+    // }
+    // #[test]
+    // fn test_fail_x_char_offset() {
+    //     todo!()
+    // }
 }

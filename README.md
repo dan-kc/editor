@@ -18,13 +18,14 @@ src/
 
 ## TODO
 
+1)
+
 -- fix:insert mode not working
 
--- W
 -- b, B
--- e, E
 
--- some kind of text_area abstraction
+-- viewport & some kind of text_area abstraction
 
 -- flesh out git stuff
-
+-- account for numbers in the next word thing
+-- better abstraction for iterating words

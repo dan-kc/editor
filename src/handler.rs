@@ -33,7 +33,10 @@ pub fn handle_normal_mode_key_events(key_event: KeyEvent, app: &mut App) -> Soft
         KeyCode::Left => app.move_left()?,
         KeyCode::Right => app.move_right(),
         KeyCode::Char('G') => app.move_to_bottom()?,
+        KeyCode::Char('W') => app.move_next_word_start_long()?,
         KeyCode::Char('w') => app.move_next_word_start()?,
+        KeyCode::Char('e') => app.move_next_word_end()?,
+        KeyCode::Char('E') => app.move_next_word_end_long()?,
         KeyCode::Home => app.move_start_line()?,
         KeyCode::End => app.move_end_line()?,
         KeyCode::Char('i') => {

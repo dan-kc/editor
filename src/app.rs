@@ -58,12 +58,6 @@ impl App {
     pub fn quit(&mut self) {
         self.running_state = RunningState::Done
     }
-    pub fn char_under_cursor(&self) -> Option<char> {
-        todo!()
-    }
-    pub fn byte_under_cursor(&self) -> Option<u8> {
-        todo!()
-    }
     pub fn insert_char(&mut self, char: char) -> SoftResult<()> {
         let byte_idx = self
             .buffer()
@@ -147,54 +141,136 @@ impl App {
     }
     pub fn move_next_word_start(&mut self) -> SoftResult<()> {
         if !self.buffer().in_bounds() {
-            return Err(SoftError::CursorOutOfBounds)
+            return Err(SoftError::CursorOutOfBounds);
         };
-        let cursor = self.buffer().cursor();
-        let line_idx = cursor.y;
-        let line = self.buffer().line(line_idx);
-
-        // Branch, first char is whitespace or not
-        let mut chars = line.chars().skip(cursor.x).enumerate();
-        let first_char = match chars.next() {
-            None => return Err(SoftError::NoMoreWordsInLine),
-            Some(c) => c,
-        }
-        .1;
-
-        let mut next_loc = cursor.x;
-        if first_char.is_whitespace() {
-            for char in chars.by_ref() {
-                let char = char.1;
-                next_loc += 1;
-                if !char.is_whitespace() {
-                    self.buffer_mut().cursor_mut().x = next_loc;
-                    return Ok(());
+        let start = match self.buffer().byte_idx_under_cursor() {
+            Some(s) => s,
+            None => return Err(SoftError::CursorOutOfBounds),
+        };
+        let end = self.buffer().byte_idx_of_line_end(self.buffer().cursor().y);
+        let words = self.buffer().words(start..end);
+        let word_idx = match self.buffer().char_under_cursor() {
+            Some(v) => {
+                if v.is_whitespace() {
+                    0
+                } else {
+                    1
                 }
             }
-            return Err(SoftError::NoMoreWordsInLine);
+            None => return Err(SoftError::CursorOutOfBounds),
         };
 
-        // Find whitespace
-        for char in chars.by_ref() {
-            let char = char.1;
-            next_loc += 1;
-            if char.is_whitespace() {
-                // We're on a whitespace
-                break;
+        match words.get(word_idx) {
+            None => Err(SoftError::NoMoreWordsInLine),
+            Some(word) => {
+                let first_char = word
+                    .chars
+                    .first()
+                    .expect("Chars array for next word is empty");
+                self.buffer_mut().cursor_mut().x = first_char.char_idx;
+                Ok(())
             }
         }
+    }
+    pub fn move_next_word_start_long(&mut self) -> SoftResult<()> {
+        if !self.buffer().in_bounds() {
+            return Err(SoftError::CursorOutOfBounds);
+        };
+        let start = match self.buffer().byte_idx_under_cursor() {
+            Some(s) => s,
+            None => return Err(SoftError::CursorOutOfBounds),
+        };
+        let end = self.buffer().byte_idx_of_line_end(self.buffer().cursor().y);
+        let words = self.buffer().words_long(start..end);
+        let word_idx = match self.buffer().char_under_cursor() {
+            Some(v) => {
+                if v.is_whitespace() {
+                    0
+                } else {
+                    1
+                }
+            }
+            None => return Err(SoftError::CursorOutOfBounds),
+        };
 
-        // Find non_whitespace
-        for char in chars.by_ref() {
-            let char = char.1;
-            next_loc += 1;
-            if !char.is_whitespace() {
-                self.buffer_mut().cursor_mut().x = next_loc;
-                return Ok(());
+        match words.get(word_idx) {
+            None => Err(SoftError::NoMoreWordsInLine),
+            Some(word) => {
+                let last_char = word
+                    .chars
+                    .first()
+                    .expect("Chars array for next word is empty");
+                self.buffer_mut().cursor_mut().x = last_char.char_idx;
+                Ok(())
             }
         }
+    }
+    pub fn move_next_word_end(&mut self) -> SoftResult<()> {
+        if !self.buffer().in_bounds() {
+            return Err(SoftError::CursorOutOfBounds);
+        };
+        let start = match self.buffer().byte_idx_under_cursor() {
+            Some(s) => s,
+            None => return Err(SoftError::CursorOutOfBounds),
+        };
+        let end = self.buffer().byte_idx_of_line_end(self.buffer().cursor().y);
+        let words = self.buffer().words(start..end);
+        let word_idx = match words.first() {
+            Some(word) => {
+                if word.chars.len() == 1{
+                    1
+                } else {
+                    0
+                }
+            }
+            None => return Err(SoftError::CursorOutOfBounds),
+        };
 
-        Err(SoftError::NoMoreWordsInLine)
+        match words.get(word_idx) {
+            None => Err(SoftError::NoMoreWordsInLine),
+            Some(word) => {
+                let last_char = word
+                    .chars
+                    .last()
+                    .expect("Chars array for next word is empty");
+                self.buffer_mut().cursor_mut().x = last_char.char_idx;
+                Ok(())
+            }
+        }
+    }
+    pub fn move_next_word_end_long(&mut self) -> SoftResult<()> {
+        if !self.buffer().in_bounds() {
+            return Err(SoftError::CursorOutOfBounds);
+        };
+        let start = match self.buffer().byte_idx_under_cursor() {
+            Some(s) => s,
+            None => return Err(SoftError::CursorOutOfBounds),
+        };
+        let end = self.buffer().byte_idx_of_line_end(self.buffer().cursor().y);
+        let words = self.buffer().words_long(start..end);
+        let word_idx = match words.first() {
+            Some(word) => {
+                if word.chars.len() == 1{
+                    1
+                } else {
+                    0
+                }
+            }
+            None => return Err(SoftError::CursorOutOfBounds),
+        };
+
+
+        match words.get(word_idx) {
+            None => Err(SoftError::NoMoreWordsInLine),
+            Some(word) => {
+                let last_char = word
+                    .chars
+                    .last()
+                    .expect("Chars array for next word is empty");
+                self.buffer_mut().cursor_mut().x = last_char.char_idx;
+                Ok(())
+            }
+        }
     }
     pub fn move_start_line(&mut self) -> SoftResult<()> {
         let line_idx = self.buffer().cursor().y;
@@ -546,7 +622,7 @@ mod tests {
         let mut app = init(MockFile::Basic);
 
         app.move_to_bottom().unwrap();
-        assert_eq!(app.buffer().cursor().y, 6);
+        assert_eq!(app.buffer().cursor().y, 3);
     }
 
     #[test]
@@ -580,26 +656,63 @@ mod tests {
         assert!(matches!(app.move_to_top(), Err(SoftError::AlreadyAtTop)));
         assert_eq!(app.buffer().cursor().y, 0);
     }
-
     #[test]
     fn test_move_next_word_start() {
         let mut app = init(MockFile::Basic);
 
         app.move_next_word_start().unwrap();
+        assert_eq!(app.buffer().cursor().x, 2);
+
+        app.move_next_word_start().unwrap();
+        assert_eq!(app.buffer().cursor().x, 3);
+
+        app.move_next_word_start().unwrap();
         assert_eq!(app.buffer().cursor().x, 10);
 
-        // from whitespace
         app.move_left().unwrap();
         app.move_next_word_start().unwrap();
         assert_eq!(app.buffer().cursor().x, 10);
     }
-
     #[test]
     fn test_fail_move_next_word_start() {
         let mut app = init(MockFile::Sparse);
 
+        app.move_next_word_start().unwrap();
+        app.move_next_word_start().unwrap();
         assert!(matches!(
             app.move_next_word_start(),
+            Err(SoftError::NoMoreWordsInLine)
+        ));
+        assert_eq!(app.buffer().cursor().x, 2);
+
+        app.move_right();
+        assert!(matches!(
+            app.move_next_word_start(),
+            Err(SoftError::CursorOutOfBounds)
+        ));
+        assert_eq!(app.buffer().cursor().x, 3);
+    }
+    #[test]
+    fn test_move_next_word_start_long() {
+        let mut app = init(MockFile::Basic);
+
+        app.move_next_word_start_long().unwrap();
+        assert_eq!(app.buffer().cursor().x, 10);
+
+        // from whitespace
+        app.move_left().unwrap();
+        app.move_next_word_start_long().unwrap();
+        assert_eq!(app.buffer().cursor().x, 10);
+
+        app.move_next_word_start_long().unwrap();
+        assert_eq!(app.buffer().cursor().x, 14);
+    }
+    #[test]
+    fn test_fail_move_next_word_start_long() {
+        let mut app = init(MockFile::Sparse);
+
+        assert!(matches!(
+            app.move_next_word_start_long(),
             Err(SoftError::NoMoreWordsInLine)
         ));
         assert_eq!(app.buffer().cursor().x, 0);
@@ -609,9 +722,107 @@ mod tests {
         app.move_right();
         app.move_right();
         assert!(matches!(
-            app.move_next_word_start(),
+            app.move_next_word_start_long(),
             Err(SoftError::CursorOutOfBounds)
         ));
         assert_eq!(app.buffer().cursor().x, 4);
+    }
+    #[test]
+    fn test_move_next_word_end() {
+        let mut app = init(MockFile::Basic);
+
+        app.move_next_word_end().unwrap();
+        assert_eq!(app.buffer().cursor().x, 1);
+
+        app.move_next_word_end().unwrap();
+        assert_eq!(app.buffer().cursor().x, 2);
+
+        app.move_next_word_end().unwrap();
+        assert_eq!(app.buffer().cursor().x, 8);
+
+        app.move_next_word_end().unwrap();
+        assert_eq!(app.buffer().cursor().x, 11);
+
+        app.move_next_word_end().unwrap();
+        assert_eq!(app.buffer().cursor().x, 14);
+
+        app.move_next_word_end().unwrap();
+        assert_eq!(app.buffer().cursor().x, 16);
+
+        app.move_next_word_end().unwrap();
+        assert_eq!(app.buffer().cursor().x, 17);
+
+        app.move_next_word_end().unwrap();
+        assert_eq!(app.buffer().cursor().x, 19);
+
+        app.move_next_word_end().unwrap();
+        assert_eq!(app.buffer().cursor().x, 24);
+
+        app.move_next_word_end().unwrap();
+        assert_eq!(app.buffer().cursor().x, 25);
+
+        app.move_next_word_end().unwrap();
+        assert_eq!(app.buffer().cursor().x, 26);
+
+        app.move_next_word_end().unwrap();
+        assert_eq!(app.buffer().cursor().x, 27);
+
+        app.move_next_word_end().unwrap();
+        assert_eq!(app.buffer().cursor().x, 32);
+
+        app.move_next_word_end().unwrap();
+        assert_eq!(app.buffer().cursor().x, 33);
+    }
+    #[test]
+    fn test_fail_move_next_word_end() {
+        let mut app = init(MockFile::Sparse);
+
+        app.move_next_word_end().unwrap();
+        app.move_next_word_end().unwrap();
+        assert!(matches!(
+            app.move_next_word_end(),
+            Err(SoftError::NoMoreWordsInLine)
+        ));
+
+        app.move_down().unwrap();
+        assert!(matches!(
+            app.move_next_word_end(),
+            Err(SoftError::CursorOutOfBounds)
+        ));
+    }
+    #[test]
+    fn test_move_next_word_end_long() {
+        let mut app = init(MockFile::Basic);
+
+        app.move_next_word_end_long().unwrap();
+        assert_eq!(app.buffer().cursor().x, 8);
+
+        app.move_next_word_end_long().unwrap();
+        assert_eq!(app.buffer().cursor().x, 11);
+
+        app.move_next_word_end_long().unwrap();
+        assert_eq!(app.buffer().cursor().x, 14);
+
+        app.move_next_word_end_long().unwrap();
+        assert_eq!(app.buffer().cursor().x, 19);
+
+        app.move_next_word_end_long().unwrap();
+        assert_eq!(app.buffer().cursor().x, 33);
+    }
+    #[test]
+    fn test_fail_move_next_word_end_long() {
+        let mut app = init(MockFile::Sparse);
+
+        app.move_next_word_end_long().unwrap();
+        assert!(matches!(
+            app.move_next_word_end_long(),
+            Err(SoftError::NoMoreWordsInLine)
+        ));
+
+        app.move_down().unwrap();
+        assert!(matches!(
+            app.move_next_word_end_long(),
+            Err(SoftError::CursorOutOfBounds)
+        ));
     }
 }

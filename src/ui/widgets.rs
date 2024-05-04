@@ -193,7 +193,7 @@ impl<'a> Widget for CursorLine<'a> {
         } else {
             cursor_char
         };
-        let cursor_style = match self.buffer.strong_in_bounds() {
+        let cursor_style = match self.buffer.in_bounds() {
             true => Style::default().fg(Color::White).bg(Color::Blue),
             false => Style::default().fg(Color::White).bg(Color::Red),
         };
