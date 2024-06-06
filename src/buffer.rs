@@ -1,207 +1,224 @@
-use crop::{Rope, RopeBuilder, RopeSlice};
+use ropey::{Rope, RopeSlice};
 use std::{
-    fs::File,
-    io::{self, BufRead, BufReader},
-    ops::RangeBounds,
-    panic,
+    error::Error, fmt::Display, fs::File, io, ops::RangeBounds, result::Result,
 };
 
+// TODO: account for a change in file name.
 #[derive(Debug, Default)]
 pub struct Buffer {
     file_name: Box<str>,
     rope: Rope,
-    cursor: Cursor,
+    pub cursor: Cursor,
 }
+
 impl Buffer {
-    // Create text buffer from file
+    // Create buffer from file
     pub fn from_file(file_name: String) -> io::Result<Buffer> {
         let file_name: Box<str> = file_name.into();
         let file = File::open(file_name.as_ref())?;
-        let rope = Rope::from_file(file)?;
+        let rope = Rope::from_reader(file)?.remove_last_new_line_char();
         let buf = Buffer {
             file_name,
             rope,
             cursor: Default::default(),
         };
+
         Ok(buf)
     }
+
     pub fn file_name(&self) -> &str {
         &self.file_name
     }
-    pub fn cursor(&self) -> &Cursor {
-        &self.cursor
+
+    /// Number of lines in buffer
+    pub fn len_lines(&self) -> usize {
+        self.rope.len_lines()
     }
-    pub fn cursor_mut(&mut self) -> &mut Cursor {
-        &mut self.cursor
+
+    /// The line as a RopeSlice.
+    /// The \n is included in each line.
+    pub fn line(&self, line_idx: usize) -> BufferResult<Line> {
+        let in_bounds = line_idx < self.len_lines();
+        if !in_bounds {
+            return Err(BufferError::LineIndexOutOfBounds(
+                line_idx,
+                self.len_lines(),
+            ));
+        }
+
+        Ok(self.rope.line(line_idx).into())
     }
-    /// Number of lines in buffer.
-    pub fn lines_count(&self) -> usize {
-        self.rope.line_len()
-    }
-    /// Number of chars in line INCLUDING '\n'
-    pub fn line_chars_count(&self, line_idx: usize) -> usize {
-        self.rope.line(line_idx).chars().count() + 1
-    }
-    pub fn byte(&self, idx: usize) -> u8 {
-        self.rope.byte(idx)
-    }
-    /// Panics if line does not exist. The \n is NOT included in line.
-    pub fn line(&self, idx: usize) -> RopeSlice {
-        self.rope.line(idx)
-    }
+
     pub fn is_empty(&self) -> bool {
-        self.rope.byte_len() == 1
+        self.rope.len_bytes() == 0
     }
-    /// Byte index of first byte in line.
-    pub fn byte_idx_of_line_start(&self, line_idx: usize) -> usize {
-        self.rope.byte_of_line(line_idx)
+
+    /// char len of rope.
+    pub fn len(&self) -> usize {
+        self.rope.len_chars()
     }
-    /// Byte index of last byte in line. usually \n
-    pub fn byte_idx_of_line_end(&self, line_idx: usize) -> usize {
-        let result = panic::catch_unwind(|| self.rope.byte_of_line(line_idx + 1));
-        match result {
-            Ok(r) => r - 1,
+
+    /// Is the position on the tail of the rope. The tail is the position just after the last element
+    /// in the rope.
+    pub fn on_rope_tail(&self, pos: (usize, usize)) -> bool {
+        let on_last_line = self.len_lines() == pos.1 + 1;
+        if !on_last_line {
+            return false;
+        }
+
+        // We are on the last line
+        self.line(pos.1).unwrap().len() == pos.0
+    }
+
+    pub fn char_idx_under_pos(
+        &self,
+        pos: (usize, usize),
+    ) -> BufferResult<usize> {
+        if !self.in_rope_bounds(pos) {
+            return Err(BufferError::CursorOutOfBounds);
+        };
+
+        let line_idx = pos.1;
+        let x_offset = pos.0;
+
+        Ok(self.rope.try_line_to_char(line_idx)? + x_offset)
+    }
+
+    /// Returns the char under the position.
+    pub fn char_under_pos(&self, pos: (usize, usize)) -> BufferResult<char> {
+        let char_idx = self.char_idx_under_pos(pos)?;
+        Ok(self.rope.char(char_idx))
+    }
+
+    /// Is the position currently in bounds of the rope. \n classifies as is in bounds.
+    pub fn in_rope_bounds(&self, pos: (usize, usize)) -> bool {
+        let line = match self.line(pos.1) {
+            Ok(l) => l,
             Err(_) => {
-                let is_last_line = self.lines_count() == line_idx + 1;
-                if is_last_line {
-                    self.rope.byte_len() - 1
-                } else {
-                    panic!("line out of bounds");
-                }
+                return false;
             }
-        }
-    }
-    pub fn byte_idx_under_cursor(&self) -> Option<usize> {
-        let cursor = self.cursor;
-        let line = self.line(cursor.y);
-        let mut byte_idx = self.byte_idx_of_line_start(cursor.y);
-        for (i, c) in line.chars().enumerate() {
-            if i == cursor.x {
-                return Some(byte_idx);
-            }
-            byte_idx += c.len_utf8();
-        }
-        let is_on_newline_char = self.line_chars_count(cursor.y) == self.cursor.x + 1;
-        if !is_on_newline_char {
-            return None;
-        };
-        if self.lines_count() == cursor.y + 1 {
-            None
-        } else {
-            Some(byte_idx)
-        }
-    }
-    pub fn char_under_cursor(&self) -> Option<char> {
-        if !self.in_rope_bounds() {
-            return None;
         };
 
-        let line_idx = self.cursor().y;
-        let x_offset = self.cursor().x;
-        let mut line = self.line(line_idx).to_string();
-        line.push('\n');
-        let chars = line.chars().enumerate();
+        pos.0 < line.len()
+    }
 
-        for (idx, char) in chars {
-            if x_offset == idx {
-                return Some(char);
+    /// Is the position currently in visual bounds. \n classifies as out of bounds
+    pub fn in_visual_bounds(&self, pos: (usize, usize)) -> bool {
+        let line = match self.line(pos.1) {
+            Ok(l) => l,
+            Err(_) => {
+                return false;
             }
-        }
+        };
 
-        None
+        pos.0 < line.visual_len()
     }
-    /// Is the cursor currently in bounds of the rope. \n is in bounds
-    pub fn in_rope_bounds(&self) -> bool {
-        self.byte_idx_under_cursor().is_some()
-    }
-    /// Is the cursor currently in bounds of line. \n is out of bounds
-    pub fn in_bounds(&self) -> bool {
-        match self.char_under_cursor() {
-            Some(char) => char != '\n',
-            None => false,
-        }
-    }
+
+    /// Number col for the line.
     pub fn numb_col(&self, line_idx: usize) -> Box<str> {
-        let mut res: String = " ".to_string();
+        let mut res = " ".to_string();
         let total_width = self.line_numb_col_width();
         let line_numb = &(line_idx + 1).to_string();
+
         res.push_str(line_numb);
+
         let right_padding_width = total_width - 3 - line_numb.len();
+
         for _ in 0..right_padding_width {
             res.push(' ');
         }
         res.push('┆');
         res.push(' ');
+
         res.into_boxed_str()
     }
-    pub fn line_empty(&self, line_idx: usize) -> bool {
-        self.line(line_idx).chars().count() == 0
+
+    /// Remove a range.
+    /// Panics if the start of the range is greater than the end, or if the
+    /// end is out of bounds (i.e. `end > len_chars()`).
+    pub fn remove<R: RangeBounds<usize>>(
+        &mut self,
+        char_range: R,
+    ) -> BufferResult<()> {
+        self.rope.try_remove(char_range)?;
+        Ok(())
     }
-    pub fn remove<R: RangeBounds<usize>>(&mut self, byte_range: R) {
-        self.rope.delete(byte_range)
+
+    pub fn char_idx_line_start(&self, line_idx: usize) -> BufferResult<usize> {
+        let idx = self.rope.try_line_to_char(line_idx)?;
+        Ok(idx)
     }
-    pub fn remove_line(&mut self, line_idx: usize) {
-        self.remove(self.byte_idx_of_line_start(line_idx)..=self.byte_idx_of_line_end(line_idx))
+
+    /// Including '\n'.
+    pub fn char_idx_line_end(&self, line_idx: usize) -> BufferResult<usize> {
+        let idx = self.rope.try_line_to_char(line_idx + 1)? - 1;
+        Ok(idx)
     }
-    pub fn insert(&mut self, byte_offset: usize, text: String) {
-        self.rope.insert(byte_offset, text)
+
+    /// Delete line.
+    pub fn delete_line(&mut self, line_idx: usize) -> BufferResult<()> {
+        self.remove(
+            self.char_idx_line_start(line_idx)?
+                ..=self.char_idx_line_end(line_idx)?,
+        )
     }
+
+    pub fn insert<T: AsRef<str>>(
+        &mut self,
+        char_offset: usize,
+        text: T,
+    ) -> BufferResult<()> {
+        self.rope.try_insert(char_offset, text.as_ref())?;
+
+        Ok(())
+    }
+
     /// Calculates the with of number column
     /// left margin + right margin + border = 3
     pub fn line_numb_col_width(&self) -> usize {
-        self.lines_count().to_string().len() + 3
+        self.len_lines().to_string().len() + 3
     }
-    pub fn words<T: RangeBounds<usize>>(&self, byte_range: T) -> Box<[Word]> {
-        let mut byte_idx = match byte_range.start_bound() {
-            std::ops::Bound::Included(val) => *val,
-            std::ops::Bound::Excluded(val) => *val + 1,
-            std::ops::Bound::Unbounded => 0,
-        };
-        let rope_slice = self.rope.byte_slice(byte_range);
-        let chars = rope_slice.chars();
-        let mut words = Vec::new();
-        let mut curr_chars = Vec::new();
-        let mut char_idx = self.cursor().x ;
-        let mut last_len: Option<usize> = None;
 
-        for char in chars {
-            let char = Char {
-                char,
-                byte_idx,
-                char_idx,
-            };
-            char_idx += 1;
-            byte_idx += char.char.len_utf8();
-            last_len = Some(char.char.len_utf8());
+    /// Returns the words of the line.
+    /// # Panics
+    ///
+    /// Panics if the start of the range is greater than the end, or if the
+    /// end is out of bounds (i.e. `end > len_chars()`).
+    pub fn words<T: RangeBounds<usize>>(
+        &self,
+        char_range: T,
+    ) -> BufferResult<Box<[Word]>> {
+        let slice = self.rope.slice(char_range);
+        let chars = slice.chars();
+        let mut words = Vec::<Word>::new();
+        let mut curr_chars = Vec::<Char>::new();
 
+        for (char_idx, char) in chars.enumerate() {
+            let char = Char { char, char_idx };
             let curr_type = char.classify();
-            let prev_type = curr_chars.last().map(|char: &Char| char.classify());
+            let prev_type = curr_chars.last().map(|char| char.classify());
 
             let same_type_as_prev = match prev_type {
                 Some(t) => t == curr_type,
                 None => false,
             };
-            let is_empty = curr_chars.is_empty();
             if same_type_as_prev {
                 curr_chars.push(char);
                 continue;
             };
-            // types differ from this point
+
+            let is_empty = curr_chars.is_empty();
             if is_empty && curr_type == CharType::Whitespace {
                 continue;
             }
+
             if is_empty && curr_type != CharType::Whitespace {
                 curr_chars.push(char);
                 continue;
             }
-            // curr_chars non empty at this point
-            let byte_len = curr_chars
-                .iter()
-                .fold(0, |acc, char| acc + char.char.len_utf8());
-            let word = Word {
-                chars: curr_chars.into_boxed_slice(),
-                byte_len,
-            };
+
+            let word = curr_chars.into_boxed_slice();
+
             if curr_type == CharType::Whitespace {
                 words.push(word);
                 curr_chars = Vec::new();
@@ -210,73 +227,164 @@ impl Buffer {
                 curr_chars = vec![char];
             };
         }
-        if !curr_chars.is_empty() && last_len.is_some() {
-            let byte_len = curr_chars
-                .iter()
-                .fold(0, |acc, char| acc + char.char.len_utf8());
-            let word = Word {
-                chars: curr_chars.into_boxed_slice(),
-                byte_len,
-            };
+
+        if !curr_chars.is_empty() {
+            let word = curr_chars.into_boxed_slice();
+
             words.push(word);
         };
-        words.into_boxed_slice()
+
+        Ok(words.into_boxed_slice())
     }
-    pub fn words_long<T: RangeBounds<usize>>(&self, byte_range: T) -> Box<[Word]> {
-        let mut byte_idx = match byte_range.start_bound() {
-            std::ops::Bound::Included(val) => *val,
-            std::ops::Bound::Excluded(val) => *val + 1,
-            std::ops::Bound::Unbounded => 0,
-        };
-        let rope_slice = self.rope.byte_slice(byte_range);
-        let chars = rope_slice.chars();
-        let mut words = Vec::new();
+
+    /// Returns the WORDS in the supplied byte_range
+    pub fn words_long<T: RangeBounds<usize>>(
+        &self,
+        char_range: T,
+    ) -> BufferResult<Box<[Word]>> {
+        let slice = self.rope.slice(char_range);
+        let chars = slice.chars();
+        let mut words = Vec::<Word>::new();
         let mut curr_chars = Vec::new();
-        let mut char_idx = self.cursor().x;
-        let mut last_len: Option<usize> = None;
+        let mut last_char_idx = 0;
 
-        for char in chars {
-            let char = Char {
-                char,
-                byte_idx,
-                char_idx,
-            };
-            char_idx += 1;
-            byte_idx += char.char.len_utf8();
-            last_len = Some(char.char.len_utf8());
-
-            let is_empty = curr_chars.is_empty();
-            if !char.char.is_whitespace() {
+        for (char_idx, char) in chars.enumerate() {
+            let char = Char { char, char_idx };
+            if char.classify() != CharType::Whitespace {
                 curr_chars.push(char);
                 continue;
             }
+
+            let is_empty = curr_chars.is_empty();
             if is_empty {
                 continue;
             };
 
-            let byte_len = curr_chars
-                .iter()
-                .fold(0, |acc, char| acc + char.char.len_utf8());
-            let word = Word {
-                chars: curr_chars.into_boxed_slice(),
-                byte_len,
-            };
+            let word = curr_chars.into_boxed_slice();
+
             words.push(word);
             curr_chars = Vec::new();
         }
-        if !curr_chars.is_empty() && last_len.is_some() {
-            let byte_len = curr_chars
-                .iter()
-                .fold(0, |acc, char| acc + char.char.len_utf8());
-            let word = Word {
-                chars: curr_chars.into_boxed_slice(),
-                byte_len,
-            };
+
+        if !curr_chars.is_empty() {
+            let word = curr_chars.into_boxed_slice();
+
             words.push(word);
         };
-        words.into_boxed_slice()
+
+        Ok(words.into_boxed_slice())
+    }
+
+    /// Returns the (x,y) position of the last visual char in file.
+    /// Should error if no chars in file.
+    pub fn end_pos(&self) -> BufferResult<(usize, usize)> {
+        if self.rope.len_chars() == 0 {
+            return Err(BufferError::NoCharsInFile);
+        };
+        let last_line_idx = self.rope.len_lines() - 1;
+        let last_line = self.line(last_line_idx)?;
+
+        if last_line.is_empty() {
+            let prev_line_idx = last_line_idx - 1;
+            let prev_line = self
+                .line(last_line_idx - 1)
+                .expect("prev line should exist");
+            Ok((prev_line.len() - 2, prev_line_idx))
+        } else {
+            Ok((last_line.len() - 1, last_line_idx))
+        }
     }
 }
+
+#[derive(Debug)]
+pub enum BufferError {
+    NoCharsInFile,
+    NoBytesInLine,
+    CursorOutOfBounds,
+    CharRangeInvalid(
+        usize, // Start
+        usize, // End
+    ),
+    CharRangeOutOfBounds(
+        Option<usize>, // Start
+        Option<usize>, // End
+        usize,         // Rope char length
+    ),
+    InsertPointOutOfBounds(
+        usize, // Attempted index.
+        usize, // Actual char count.
+    ),
+    LineIndexOutOfBounds(
+        usize, // Attempted index.
+        usize, // Actual line length.
+    ),
+}
+
+impl Error for BufferError {}
+
+impl Display for BufferError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Buffer error: ");
+        match *self {
+            Self::NoCharsInFile => {
+                write!(f, "no bytes in line")
+            }
+            Self::NoBytesInLine => {
+                write!(f, "no bytes in line")
+            }
+            Self::CursorOutOfBounds => {
+                write!(f, "cursor is out of bounds")
+            }
+            Self::InsertPointOutOfBounds(attempted_idx, rope_len) => {
+                write!(
+                    f,
+                    "Insert index {} out of bounds. {} chars in rope.",
+                    attempted_idx, rope_len
+                )
+            }
+            Self::CharRangeOutOfBounds(start_idx_opt, end_idx_opt, len) => {
+                write!(f, "Char range out of bounds: char range ")?;
+                write_range(f, start_idx_opt, end_idx_opt)?;
+                write!(f, ", Rope/RopeSlice char length {}", len)
+            }
+            Self::CharRangeInvalid(start_idx, end_idx) => {
+                write!(
+                    f,
+                    "Invalid char range {}..{}: start must be <= end",
+                    start_idx, end_idx
+                )
+            }
+            Self::LineIndexOutOfBounds(attempted_idx, rope_len) => {
+                write!(
+                    f,
+                    "Line index {} out of bounds. {} lines in rope.",
+                    attempted_idx, rope_len
+                )
+            }
+        }
+    }
+}
+
+impl From<ropey::Error> for BufferError {
+    fn from(err: ropey::Error) -> Self {
+        match err {
+            ropey::Error::CharRangeInvalid(start, end) => {
+                todo!()
+            }
+            ropey::Error::CharIndexOutOfBounds(start, end) => {
+                todo!()
+            }
+            ropey::Error::LineIndexOutOfBounds(start, end) => {
+                todo!()
+            }
+            _ => {
+                panic!("this is a rope error we have not accounted for")
+            }
+        }
+    }
+}
+
+pub type BufferResult<T> = Result<T, BufferError>;
 
 #[derive(Eq, PartialEq, Copy, Clone)]
 enum CharType {
@@ -286,17 +394,12 @@ enum CharType {
     Whitespace,
 }
 
-#[derive(Debug)]
-pub struct Word {
-    pub chars: Box<[Char]>,
-    pub byte_len: usize,
-}
+type Word = Box<[Char]>;
 
 #[derive(Debug)]
 pub struct Char {
     pub char: char,
-    pub byte_idx: usize, // of entire rope
-    pub char_idx: usize, // of specified range
+    pub char_idx: usize,
 }
 
 impl Char {
@@ -314,136 +417,139 @@ impl Char {
     }
 }
 
-trait FileReader {
-    fn from_file(file: File) -> io::Result<Rope>;
-}
-impl FileReader for Rope {
-    fn from_file(file: File) -> io::Result<Rope> {
-        let reader = BufReader::new(&file);
-        let mut rope_builder = RopeBuilder::new();
+fn write_range(
+    f: &mut std::fmt::Formatter<'_>,
+    start_idx: Option<usize>,
+    end_idx: Option<usize>,
+) -> std::fmt::Result {
+    match (start_idx, end_idx) {
+        (None, None) => {
+            write!(f, "..")
+        }
 
-        let mut lines = reader.lines().peekable();
-        let mut is_empty = true;
-        while let Some(line_result) = lines.next() {
-            is_empty = false;
-            let line = line_result?;
-            match std::str::from_utf8(line.as_bytes()) {
-                Ok(utf8_str) => {
-                    let mut str_new_line = utf8_str.to_string();
-                    if lines.peek().is_some() {
-                        str_new_line.push('\n');
-                    };
-                    rope_builder.append(str_new_line);
-                }
-                Err(error) => {
-                    let error_msg = format!("UTF-8 decoding error: {}", error);
-                    return Err(io::Error::new(io::ErrorKind::InvalidData, error_msg));
-                }
-            };
+        (Some(start), None) => {
+            write!(f, "{}..", start)
         }
-        if is_empty {
-            rope_builder.append('\n'.to_string());
+
+        (None, Some(end)) => {
+            write!(f, "..{}", end)
         }
-        Ok(rope_builder.build())
+
+        (Some(start), Some(end)) => {
+            write!(f, "{}..{}", start, end)
+        }
     }
 }
 
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct Cursor {
     pub x: usize,
     pub y: usize,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::panic;
-
-    enum MockFile {
-        Basic,
-        Empty,
-        Sparse,
+impl From<(usize, usize)> for Cursor {
+    fn from(value: (usize, usize)) -> Self {
+        Cursor {
+            x: value.0,
+            y: value.1,
+        }
     }
+}
 
-    fn init(file: MockFile) -> Buffer {
-        let file_name: String = match file {
-            MockFile::Basic => "tests/mocks/basic.txt".into(),
-            MockFile::Empty => "tests/mocks/empty.txt".into(),
-            MockFile::Sparse => "tests/mocks/sparse.txt".into(),
+impl Into<(usize, usize)> for Cursor {
+    fn into(self) -> (usize, usize) {
+        (self.x, self.y)
+    }
+}
+
+/// A ropeslice wrapper with extra methods for line operations.
+#[derive(Debug)]
+pub struct Line<'a> {
+    slice: RopeSlice<'a>,
+}
+
+impl<'a> From<RopeSlice<'a>> for Line<'a> {
+    fn from(slice: RopeSlice<'a>) -> Self {
+        Self { slice }
+    }
+}
+
+impl<'a> Display for Line<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Display the underlying rope. Swap out newline char, and whitespace char, for fonts.
+        write!(f, "{}", self.slice)
+    }
+}
+
+impl<'a> Line<'a> {
+    /// Returns true if there are no visual chars in line. This means the underlying rope is empty
+    /// or it only has a newline char.
+    pub fn is_visually_empty(&self) -> bool {
+        let chars = self.slice.chars();
+        let len = chars.len();
+        if len == 0 || len == 1 && chars.last().unwrap() == '\n' {
+            return true;
         };
-        Buffer::from_file(file_name).unwrap()
+
+        false
     }
-
-    #[test]
-    fn test_open_file() {
-        let buffer = init(MockFile::Sparse);
-        assert_eq!(buffer.byte(0), b'P');
-        assert_eq!(buffer.byte(3), b'\n');
-        assert_eq!(buffer.byte(4), b'\n');
-        assert_eq!(buffer.byte(5), b'\n');
-
-        assert_eq!(buffer.byte(14), b' ');
-        assert_eq!(buffer.byte(27), b'.');
-
-        let result = panic::catch_unwind(|| buffer.byte(28));
-        assert!(result.is_err());
+    /// Returns true if there are no chars in line. This means the underlying rope is empty.
+    pub fn is_empty(&self) -> bool {
+        self.slice.len_chars() == 0
     }
+    /// Returns the char length of the line, ignoring newline chars.
+    pub fn visual_len(&self) -> usize {
+        // Check last char,
+        let chars = self.chars();
+        let last_char = match chars.last() {
+            Some(char) => char,
+            None => return 0,
+        };
 
-    #[test]
-    fn test_open_empty_file() {
-        let buffer = init(MockFile::Empty);
-        assert!(buffer.is_empty())
+        match last_char {
+            '\n' => chars.len() - 1,
+            _ => chars.len(),
+        }
     }
-    #[test]
-    fn test_byte_idx_under_cursor() {
-        let mut buffer = init(MockFile::Basic);
-
-        buffer.cursor_mut().y = 0;
-        buffer.cursor_mut().x = 10;
-        assert_eq!(buffer.byte_idx_under_cursor().unwrap(), 12);
-
-        buffer.cursor_mut().y = 0;
-        buffer.cursor_mut().x = 34;
-        assert_eq!(buffer.byte_idx_under_cursor().unwrap(), 37); // \n
+    /// Returns the char length of the line, including newline chars.
+    pub fn len(&self) -> usize {
+        self.slice.len_chars()
     }
-    #[test]
-    fn test_char_under_cursor() {
-        let mut buffer = init(MockFile::Basic);
-
-        buffer.cursor_mut().y = 3;
-        buffer.cursor_mut().x = 18;
-        assert_eq!(buffer.char_under_cursor().unwrap(), 'd');
-
-        buffer.cursor_mut().y = 0;
-        buffer.cursor_mut().x = 34;
-        assert_eq!(buffer.char_under_cursor().unwrap(), '\n');
-
-        buffer.cursor_mut().y = 2;
-        buffer.cursor_mut().x = 0;
-        assert_eq!(buffer.char_under_cursor().unwrap(), '\n');
+    /// Returns an array of words.
+    pub fn words(&self) -> Box<[Word]> {
+        todo!()
     }
-    #[test]
-    fn test_fail_char_under_cursor() {
-        let mut buffer = init(MockFile::Basic);
-
-        buffer.cursor_mut().y = 0;
-        buffer.cursor_mut().x = 35;
-        assert!(buffer.char_under_cursor().is_none());
-
-        buffer.cursor_mut().y = 2;
-        buffer.cursor_mut().x = 1;
-        assert!(buffer.char_under_cursor().is_none());
-
-        buffer.cursor_mut().y = 3;
-        buffer.cursor_mut().x = 34;
-        assert!(buffer.char_under_cursor().is_none());
+    /// Returns an array of long words seperated by whitespaces.
+    pub fn words_long(&self) -> Box<[Word]> {
+        todo!()
     }
-    // #[test]
-    // fn test_x_char_offset() {
-    //     let mut buffer = init(MockFile::Basic);
-    // }
-    // #[test]
-    // fn test_fail_x_char_offset() {
-    //     todo!()
-    // }
+    /// Returns the chars including newline char.
+    pub fn chars(&self) -> Box<[char]> {
+        let chars = self.slice.chars();
+        let mut res = vec![];
+        for (char_idx, char) in chars.enumerate() {
+            res.push(char);
+        }
+        res.into_boxed_slice()
+    }
+    /// Returns the chars excluding the newline char.
+    pub fn visual_chars(&self) -> Box<[char]> {
+        todo!()
+    }
+}
+
+trait LastLineRemover {
+    fn remove_last_new_line_char(self) -> Self;
+}
+
+impl LastLineRemover for Rope {
+    /// From reader adds an extra '\n'sometimes.
+    fn remove_last_new_line_char(mut self) -> Self {
+        let is_empty = self.len_chars() == 0;
+        if !is_empty {
+            let last_char_idx = self.len_chars() - 1;
+            self.remove(last_char_idx..=last_char_idx);
+        };
+        self
+    }
 }

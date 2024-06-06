@@ -18,14 +18,10 @@ src/
 
 ## TODO
 
-1)
-
--- fix:insert mode not working
-
+-- Flatten errors
 -- b, B
 
--- viewport & some kind of text_area abstraction
+-- viewport & some kind of text_area abstraction (look at yazi)
 
 -- flesh out git stuff
--- account for numbers in the next word thing
--- better abstraction for iterating words
+-- action builder?
