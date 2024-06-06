@@ -606,6 +606,19 @@ mod tests {
         assert_eq!(app.buffer.cursor, (13, 0).into());
         assert_eq!(app.buffer.line(0).unwrap().to_string(), "hiahetsaithehi");
 
+        // On newline char
+        let mut app = init(MockFile::Basic);
+        let mut handler = handler::Handler::new();
+        handler.handle_key_event(end_key_event, &mut app);
+        handler.handle_key_event(right_key_event, &mut app);
+        handler.handle_key_event(i_key_event, &mut app);
+        handler.handle_key_event(h_key_event, &mut app);
+        handler.handle_key_event(i_key_event, &mut app);
+        handler.handle_key_event(esc_key_event, &mut app);
+        assert!(app.notifs().is_empty());
+        assert_eq!(app.buffer.cursor, (35, 0).into());
+        assert_eq!(app.buffer.line(0).unwrap().to_string(), "Po:¢ti¢or l¢  a d.am soll!c7tudin.hi\n");
+
         // Empty file.
         let mut app = init(MockFile::Empty);
         let mut handler = handler::Handler::new();

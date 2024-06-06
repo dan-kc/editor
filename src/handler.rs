@@ -107,7 +107,7 @@ impl Handler {
             KeyCode::Char('i') => {
                 self.key_events = vec![key_event];
                 let pos = app.buffer.cursor.into();
-                if app.buffer.in_visual_bounds(pos)
+                if app.buffer.in_rope_bounds(pos)
                     || app.buffer.on_rope_tail(pos)
                 {
                     app.enter_mode(Mode::Insert);
