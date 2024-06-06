@@ -286,15 +286,14 @@ impl App {
     /// Move cursor to x=0. Also returns an error if the line has no chars or the cursor is already
     /// x = 0.
     pub fn move_start_line(&mut self) -> AppResult<()> {
-        let line_idx = self.buffer.cursor.y;
-        if self.buffer.line(line_idx)?.is_visually_empty() {
-            return Err(AppError::LineEmpty);
-        }
         if self.buffer.cursor.x == 0 {
             return Err(AppError::AlreadyAtLineStart);
         };
-
+        let line_idx = self.buffer.cursor.y;
         self.buffer.cursor.x = 0;
+        if self.buffer.line(line_idx)?.is_visually_empty() {
+            return Err(AppError::LineEmpty);
+        }
 
         Ok(())
     }
