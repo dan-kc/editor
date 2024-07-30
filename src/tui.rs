@@ -1,5 +1,7 @@
 use crate::{
-    app::{App, IoResult}, logger::Logger, ui
+    app::{App, IoResult},
+    logger::Logger,
+    ui,
 };
 use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
 use ratatui::{
@@ -24,12 +26,18 @@ pub fn exit() -> IoResult<()> {
 pub fn install_panic_hook() {
     let original_hook = panic::take_hook();
     panic::set_hook(Box::new(move |panic_info| {
-        exit().expect("custom panic hook failed i'm so sorry i fucked up your terminal");
+        exit().expect(
+            "custom panic hook failed i'm so sorry i fucked up your terminal",
+        );
         original_hook(panic_info);
     }));
 }
 
-pub fn draw(terminal: &mut Terminal<impl Backend>, app: &App, logger: &Logger) -> IoResult<()> {
-    terminal.draw(|frame| ui::render(app, logger,frame))?;
+pub fn draw(
+    terminal: &mut Terminal<impl Backend>,
+    app: &App,
+    logger: &Logger,
+) -> IoResult<()> {
+    terminal.draw(|frame| ui::render(app, logger, frame))?;
     Ok(())
 }

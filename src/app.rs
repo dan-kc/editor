@@ -56,13 +56,18 @@ impl App {
     }
 
     pub fn delete_lines(&mut self, count: usize) -> AppResult<()> {
-        todo!();
-        if self.buffer.len_lines() == 0 {
-            return Err(AppError::NoMoreLinesToDelete);
-        }
-
         let line_idx = self.buffer.cursor.y;
-        let _ = self.buffer.delete_line(line_idx);
+        let in_bound = line_idx + count <= self.buffer.len_lines();
+        if count == 0 {
+            return Ok(())
+        }
+        if !in_bound {
+            return Err(AppError::NoMoreLinesToDelete);
+        };
+
+        let start_idx = self.buffer.char_idx_line_start(line_idx)?;
+        let end_idx = self.buffer.char_idx_line_end(line_idx + count - 1)?;
+        self.buffer.remove(start_idx..=end_idx)?;
 
         Ok(())
     }
@@ -185,7 +190,7 @@ impl App {
         }
     }
 
-    pub fn move_next_word_start_long(&mut self, count: usize) -> AppResult<()> {
+    pub fn move_next_long_word_start(&mut self, count: usize) -> AppResult<()> {
         let cursor = self.buffer.cursor;
         if !self.buffer.in_visual_bounds(cursor.into()) {
             return Err(AppError::CursorOutOfBounds);
@@ -245,15 +250,15 @@ impl App {
         }
     }
 
-    pub fn move_next_word_end_long(&mut self, count: usize) -> AppResult<()> {
+    pub fn move_next_long_word_end(&mut self, count: usize) -> AppResult<()> {
         let cursor = self.buffer.cursor;
         if !self.buffer.in_visual_bounds(cursor.into()) {
             return Err(AppError::CursorOutOfBounds);
         };
 
         let start = self.buffer.char_idx_line_start(cursor.y)? + cursor.x;
-        let end = self.buffer.char_idx_line_start(cursor.y + 1)? - 1;
-        let words = self.buffer.words_long(start..end)?;
+        let end = self.buffer.char_idx_line_end(cursor.y)?;
+        let words = self.buffer.words_long(start..=end)?;
 
         let word_idx = match words.first() {
             Some(word) => {
@@ -278,6 +283,44 @@ impl App {
         }
     }
 
+    pub fn move_prev_long_word_start(&mut self, count: usize) -> AppResult<()> {
+        todo!()
+    }
+
+    /// Moves to the start of the prev word in the line.
+    pub fn move_prev_word_start(&mut self, count: usize) -> AppResult<()> {
+        let cursor = self.buffer.cursor;
+        if cursor.x == 0 {
+            return Err(AppError::NoMoreWordsInLine);
+        }
+
+        let on_empty_last_line = cursor.y == self.buffer.len_lines() - 1
+            && self.buffer.line(cursor.y)?.chars().len() == 0;
+        if on_empty_last_line {
+            return Err(AppError::NoMoreWordsInLine);
+        }
+
+        // Line is not empty.
+        let start = self.buffer.char_idx_line_start(cursor.y)?;
+        let end = std::cmp::min(
+            self.buffer.char_idx_line_start(cursor.y)? + cursor.x - 1, // the char before
+            self.buffer.char_idx_line_end(cursor.y)?,
+        );
+        let mut words_in_line = self.buffer.words(start..=end)?;
+        words_in_line.reverse();
+
+        match words_in_line.get(count - 1) {
+            None => Err(AppError::NoMoreWordsInLine),
+            Some(word) => {
+                let first_char =
+                    word.first().expect("Chars array for prev word is empty");
+                self.buffer.cursor.x = first_char.char_idx;
+
+                Ok(())
+            }
+        }
+    }
+
     /// Move to the newline char on line. If it does't exist, error.
     pub fn move_new_line_char(&mut self) -> AppResult<()> {
         todo!()
@@ -286,14 +329,17 @@ impl App {
     /// Move cursor to x=0. Also returns an error if the line has no chars or the cursor is already
     /// x = 0.
     pub fn move_start_line(&mut self) -> AppResult<()> {
-        if self.buffer.cursor.x == 0 {
-            return Err(AppError::AlreadyAtLineStart);
-        };
         let line_idx = self.buffer.cursor.y;
+        let at_line_start = self.buffer.cursor.x == 0;
         self.buffer.cursor.x = 0;
+
         if self.buffer.line(line_idx)?.is_visually_empty() {
             return Err(AppError::LineEmpty);
         }
+
+        if at_line_start {
+            return Err(AppError::AlreadyAtLineStart);
+        };
 
         Ok(())
     }

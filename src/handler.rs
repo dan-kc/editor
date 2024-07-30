@@ -80,7 +80,7 @@ impl Handler {
             }
             KeyCode::Char('W') => {
                 let count = self.count.take().unwrap_or(1);
-                app.move_next_word_start_long(count)?
+                app.move_next_long_word_start(count)?
             }
             KeyCode::Char('e') => {
                 let count = self.count.take().unwrap_or(1);
@@ -88,7 +88,15 @@ impl Handler {
             }
             KeyCode::Char('E') => {
                 let count = self.count.take().unwrap_or(1);
-                app.move_next_word_end_long(count)?
+                app.move_next_long_word_end(count)?
+            }
+            KeyCode::Char('b') => {
+                let count = self.count.take().unwrap_or(1);
+                app.move_prev_word_start(count)?
+            }
+            KeyCode::Char('B') => {
+                let count = self.count.take().unwrap_or(1);
+                app.move_prev_long_word_start(count)?
             }
             KeyCode::Home => {
                 let count = self.count.take();
@@ -209,10 +217,11 @@ impl Handler {
             KeyCode::Char('d') => {
                 let count = self.count.take().unwrap_or(1);
                 app.delete_lines(count)?;
-                let log_msg = format!("deleted {} lines", count);
-                self.logger.log(Level::Info, log_msg);
                 app.enter_mode(Mode::Normal);
-                app.move_up(1)?;
+                self.reset_count();
+            }
+            KeyCode::Char(numb) if numb.is_ascii_digit() => {
+                self.add_count_digit(key_event);
             }
             KeyCode::Esc => {
                 self.reset_keys();
