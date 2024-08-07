@@ -1,9 +1,8 @@
-use crate::app::IoResult;
 use chrono::{DateTime, Local};
 use std::{
     fmt::{Display, Formatter, Result},
     fs::{self, File},
-    io::Write,
+    io::{self, Write},
 };
 
 #[derive(Debug, Default)]
@@ -39,12 +38,15 @@ impl Logger {
         }
     }
 
-    pub fn write_to_file(&mut self) -> IoResult<()> {
+    pub fn write_to_file(&mut self) -> io::Result<()> {
         fs::create_dir_all(".local/share")?;
         let mut file = File::create(".local/share/dans-editor.log")?;
 
         for log in self.logs.iter().rev() {
-            let log_line = format!("{:?} - {:?}: {}\n", log.timestamp, log.level, log.message);
+            let log_line = format!(
+                "{:?} - {:?}: {}\n",
+                log.timestamp, log.level, log.message
+            );
             file.write_all(log_line.as_bytes()).unwrap();
         }
         // TODO: Limit the number of log entries to 1000

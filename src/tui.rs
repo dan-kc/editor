@@ -1,8 +1,4 @@
-use crate::{
-    app::{App, IoResult},
-    logger::Logger,
-    ui,
-};
+use crate::{app::App, logger::Logger, ui};
 use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
 use ratatui::{
     backend::{Backend, CrosstermBackend},
@@ -10,14 +6,14 @@ use ratatui::{
 };
 use std::{io, panic};
 
-pub fn init() -> IoResult<Terminal<impl Backend>> {
+pub fn init() -> io::Result<Terminal<impl Backend>> {
     terminal::enable_raw_mode()?;
     crossterm::execute!(io::stdout(), EnterAlternateScreen)?;
     let terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
     Ok(terminal)
 }
 
-pub fn exit() -> IoResult<()> {
+pub fn exit() -> io::Result<()> {
     crossterm::execute!(io::stdout(), LeaveAlternateScreen)?;
     terminal::disable_raw_mode()?;
     Ok(())
@@ -37,7 +33,7 @@ pub fn draw(
     terminal: &mut Terminal<impl Backend>,
     app: &App,
     logger: &Logger,
-) -> IoResult<()> {
+) -> io::Result<()> {
     terminal.draw(|frame| ui::render(app, logger, frame))?;
     Ok(())
 }

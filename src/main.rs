@@ -1,10 +1,10 @@
 use editor::{
-    app::{self, IoResult, RunningState},
+    app::{self, RunningState},
     buffer::Buffer,
     handler, tui,
 };
 
-fn main() -> IoResult<()> {
+fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let path = std::env::args().nth(1).expect("file name not found");
     let buffer = Buffer::from_file(path).expect("could not find file");
     let mut app = app::App::new(buffer);

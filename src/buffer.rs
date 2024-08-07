@@ -1,7 +1,5 @@
 use ropey::{Rope, RopeSlice};
-use std::{
-    error::Error, fmt::Display, fs::File, io, ops::RangeBounds, result::Result,
-};
+use std::{fmt::Display, fs::File, io, ops::RangeBounds, result::Result};
 
 // TODO: account for a change in file name.
 #[derive(Debug, Default)]
@@ -40,7 +38,7 @@ impl Buffer {
     pub fn line(&self, line_idx: usize) -> BufferResult<Line> {
         let in_bounds = line_idx < self.len_lines();
         if !in_bounds {
-            return Err(BufferError::LineIndexOutOfBounds(
+            return Err(Error::LineIndexOutOfBounds(
                 line_idx,
                 self.len_lines(),
             ));
@@ -75,7 +73,7 @@ impl Buffer {
         pos: (usize, usize),
     ) -> BufferResult<usize> {
         if !self.in_rope_bounds(pos) {
-            return Err(BufferError::CursorOutOfBounds);
+            return Err(Error::CursorOutOfBounds);
         };
 
         let line_idx = pos.1;
@@ -279,7 +277,7 @@ impl Buffer {
     /// Should error if no chars in file.
     pub fn end_pos(&self) -> BufferResult<(usize, usize)> {
         if self.rope.len_chars() == 0 {
-            return Err(BufferError::NoCharsInFile);
+            return Err(Error::NoCharsInFile);
         };
         let last_line_idx = self.rope.len_lines() - 1;
         let last_line = self.line(last_line_idx)?;
@@ -297,7 +295,7 @@ impl Buffer {
 }
 
 #[derive(Debug)]
-pub enum BufferError {
+pub enum Error {
     NoCharsInFile,
     NoBytesInLine,
     CursorOutOfBounds,
@@ -320,9 +318,9 @@ pub enum BufferError {
     ),
 }
 
-impl Error for BufferError {}
+impl std::error::Error for Error {}
 
-impl Display for BufferError {
+impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Buffer error: ");
         match *self {
@@ -365,7 +363,7 @@ impl Display for BufferError {
     }
 }
 
-impl From<ropey::Error> for BufferError {
+impl From<ropey::Error> for Error {
     fn from(err: ropey::Error) -> Self {
         match err {
             ropey::Error::CharRangeInvalid(start, end) => {
@@ -384,7 +382,7 @@ impl From<ropey::Error> for BufferError {
     }
 }
 
-pub type BufferResult<T> = Result<T, BufferError>;
+pub type BufferResult<T> = Result<T, Error>;
 
 #[derive(Eq, PartialEq, Copy, Clone)]
 enum CharType {

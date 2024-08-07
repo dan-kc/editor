@@ -1,6 +1,6 @@
 use crate::{
-    app::{App, AppError, AppResult, IoResult, Mode, Notification},
-    logger::{Level, Logger},
+    app::{self, App, Mode, Notification},
+    logger::Logger,
 };
 use crossterm::event::{
     self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
@@ -23,7 +23,7 @@ impl Handler {
         }
     }
 
-    pub fn listen(&mut self, app: &mut App) -> IoResult<()> {
+    pub fn listen(&mut self, app: &mut App) -> std::io::Result<()> {
         match event::read()? {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 self.handle_key_event(key_event, app);
@@ -49,7 +49,7 @@ impl Handler {
         &mut self,
         key_event: KeyEvent,
         app: &mut App,
-    ) -> AppResult<()> {
+    ) -> app::Result<()> {
         match key_event.code {
             KeyCode::Up => {
                 let count = self.count.take().unwrap_or(1);
@@ -71,7 +71,7 @@ impl Handler {
                 let count = self.count.take();
                 app.move_to_end_of_file()?;
                 if count.is_some() {
-                    return Err(AppError::CountRedundant);
+                    return Err(app::Error::CountRedundant);
                 };
             }
             KeyCode::Char('w') => {
@@ -102,14 +102,14 @@ impl Handler {
                 let count = self.count.take();
                 app.move_start_line()?;
                 if count.is_some() {
-                    return Err(AppError::CountRedundant);
+                    return Err(app::Error::CountRedundant);
                 };
             }
             KeyCode::End => {
                 let count = self.count.take();
                 app.move_end_line()?;
                 if count.is_some() {
-                    return Err(AppError::CountRedundant);
+                    return Err(app::Error::CountRedundant);
                 };
             }
             KeyCode::Char('i') => {
@@ -120,24 +120,24 @@ impl Handler {
                 {
                     app.enter_mode(Mode::Insert);
                     if self.count.take().is_some() {
-                        return Err(AppError::CountRedundant);
+                        return Err(app::Error::CountRedundant);
                     };
                 } else {
-                    return Err(AppError::CursorOutOfBounds);
+                    return Err(app::Error::CursorOutOfBounds);
                 }
             }
             KeyCode::Char('g') => {
                 self.key_events = vec![key_event];
                 app.enter_mode(Mode::GoTo);
                 if self.count.take().is_some() {
-                    return Err(AppError::CountRedundant);
+                    return Err(app::Error::CountRedundant);
                 };
             }
             KeyCode::Char('d') => {
                 self.key_events = vec![key_event];
                 app.enter_mode(Mode::Delete);
                 if self.count.take().is_some() {
-                    return Err(AppError::CountRedundant);
+                    return Err(app::Error::CountRedundant);
                 };
             }
             KeyCode::Char('c') | KeyCode::Char('C') => {
@@ -151,7 +151,7 @@ impl Handler {
             }
             _ => {
                 self.reset_count();
-                return Err(AppError::KeyUnmapped);
+                return Err(app::Error::KeyUnmapped);
             }
         }
 
@@ -163,7 +163,7 @@ impl Handler {
         &mut self,
         key_event: KeyEvent,
         app: &mut App,
-    ) -> AppResult<()> {
+    ) -> app::Result<()> {
         match key_event.code {
             KeyCode::Char(char) => {
                 self.key_events.push(key_event);
@@ -181,7 +181,7 @@ impl Handler {
                 let _ = app.move_left(1);
                 app.enter_mode(Mode::Normal)
             }
-            _ => return Err(AppError::KeyUnmapped),
+            _ => return Err(app::Error::KeyUnmapped),
         }
 
         Ok(())
@@ -192,7 +192,7 @@ impl Handler {
         &self,
         key_event: KeyEvent,
         app: &mut App,
-    ) -> AppResult<()> {
+    ) -> app::Result<()> {
         match key_event.code {
             KeyCode::Char('g') => {
                 app.enter_mode(Mode::Normal);
@@ -201,7 +201,7 @@ impl Handler {
             KeyCode::Esc => {
                 app.enter_mode(Mode::Normal);
             }
-            _ => return Err(AppError::KeyUnmapped),
+            _ => return Err(app::Error::KeyUnmapped),
         };
 
         Ok(())
@@ -212,7 +212,7 @@ impl Handler {
         &mut self,
         key_event: KeyEvent,
         app: &mut App,
-    ) -> AppResult<()> {
+    ) -> app::Result<()> {
         match key_event.code {
             KeyCode::Char('d') => {
                 let count = self.count.take().unwrap_or(1);
@@ -228,7 +228,7 @@ impl Handler {
                 self.reset_count();
                 app.enter_mode(Mode::Normal);
             }
-            _ => return Err(AppError::KeyUnmapped),
+            _ => return Err(app::Error::KeyUnmapped),
         }
 
         Ok(())

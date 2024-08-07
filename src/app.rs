@@ -1,10 +1,6 @@
-use crate::buffer::{self, Buffer, BufferError};
+use crate::buffer::{self, Buffer};
 use ratatui::style::{Color, Style};
-use std::{
-    char,
-    error::{self, Error},
-    fmt::Display,
-};
+use std::{char, fmt::Display};
 
 #[derive(Debug, Default)]
 pub struct App {
@@ -42,7 +38,7 @@ impl App {
         self.running_state = RunningState::Done
     }
 
-    pub fn insert_char_before(&mut self, char: char) -> AppResult<()> {
+    pub fn insert_char_before(&mut self, char: char) -> Result<()> {
         let cursor = self.buffer.cursor;
         let on_tail = self.buffer.on_rope_tail(cursor.into());
         if on_tail {
@@ -55,14 +51,14 @@ impl App {
         Ok(())
     }
 
-    pub fn delete_lines(&mut self, count: usize) -> AppResult<()> {
+    pub fn delete_lines(&mut self, count: usize) -> Result<()> {
         let line_idx = self.buffer.cursor.y;
         let in_bound = line_idx + count <= self.buffer.len_lines();
         if count == 0 {
-            return Ok(())
+            return Ok(());
         }
         if !in_bound {
-            return Err(AppError::NoMoreLinesToDelete);
+            return Err(Error::NoMoreLinesToDelete);
         };
 
         let start_idx = self.buffer.char_idx_line_start(line_idx)?;
@@ -72,25 +68,25 @@ impl App {
         Ok(())
     }
 
-    pub fn move_up(&mut self, count: usize) -> AppResult<()> {
+    pub fn move_up(&mut self, count: usize) -> Result<()> {
         let lines_remaining = self.buffer.cursor.y;
         self.buffer
             .cursor
             .y
             .checked_sub(count)
-            .ok_or(AppError::CantMoveUp(count, lines_remaining))
+            .ok_or(Error::CantMoveUp(count, lines_remaining))
             .map(|y_pos| {
                 self.buffer.cursor.y = y_pos;
             })
     }
 
-    pub fn move_down(&mut self, count: usize) -> AppResult<()> {
+    pub fn move_down(&mut self, count: usize) -> Result<()> {
         let line_idx_to_move_to = self.buffer.cursor.y + count;
         let line_idx_of_last_line = self.buffer.len_lines() - 1;
         let attempted_line_idx_out_of_bounds =
             line_idx_to_move_to > line_idx_of_last_line;
         if attempted_line_idx_out_of_bounds {
-            return Err(AppError::CantMoveDown(
+            return Err(Error::CantMoveDown(
                 count,
                 line_idx_to_move_to - line_idx_of_last_line,
             ));
@@ -107,12 +103,12 @@ impl App {
         Ok(())
     }
 
-    pub fn move_left(&mut self, count: usize) -> AppResult<()> {
+    pub fn move_left(&mut self, count: usize) -> Result<()> {
         self.buffer
             .cursor
             .x
             .checked_sub(count)
-            .ok_or(AppError::CantMoveLeft(count, self.buffer.cursor.x))
+            .ok_or(Error::CantMoveLeft(count, self.buffer.cursor.x))
             .map(|x_pos| {
                 self.buffer.cursor.x = x_pos;
             })
@@ -130,21 +126,21 @@ impl App {
     }
 
     /// Moves to the first char in the file. If buffer is empty move to (0,0).
-    pub fn move_to_start_of_file(&mut self) -> AppResult<()> {
+    pub fn move_to_start_of_file(&mut self) -> Result<()> {
         self.buffer.cursor.y = 0;
         self.buffer.cursor.x = 0;
         if self.buffer.is_empty() {
-            return Err(AppError::NoCharsInFile);
+            return Err(Error::NoCharsInFile);
         }
 
         Ok(())
     }
 
     /// Moves to the last char in the file. If buffer is empty move to (0,0).
-    pub fn move_to_end_of_file(&mut self) -> AppResult<()> {
+    pub fn move_to_end_of_file(&mut self) -> Result<()> {
         match self.buffer.end_pos() {
             Err(err) => match err {
-                BufferError::NoCharsInFile => {
+                buffer::Error::NoCharsInFile => {
                     self.buffer.cursor = (0, 0).into();
                     Err(err.into())
                 }
@@ -162,10 +158,10 @@ impl App {
     }
 
     /// Moves to the start of the next word in the line.
-    pub fn move_next_word_start(&mut self, count: usize) -> AppResult<()> {
+    pub fn move_next_word_start(&mut self, count: usize) -> Result<()> {
         let cursor = self.buffer.cursor;
         if !self.buffer.in_visual_bounds(cursor.into()) {
-            return Err(AppError::CursorOutOfBounds);
+            return Err(Error::CursorOutOfBounds);
         };
 
         let start = self.buffer.char_idx_line_start(cursor.y)? + cursor.x;
@@ -179,7 +175,7 @@ impl App {
             };
 
         match words_in_line.get(word_idx) {
-            None => Err(AppError::NoMoreWordsInLine),
+            None => Err(Error::NoMoreWordsInLine),
             Some(word) => {
                 let first_char =
                     word.first().expect("Chars array for next word is empty");
@@ -190,10 +186,10 @@ impl App {
         }
     }
 
-    pub fn move_next_long_word_start(&mut self, count: usize) -> AppResult<()> {
+    pub fn move_next_long_word_start(&mut self, count: usize) -> Result<()> {
         let cursor = self.buffer.cursor;
         if !self.buffer.in_visual_bounds(cursor.into()) {
-            return Err(AppError::CursorOutOfBounds);
+            return Err(Error::CursorOutOfBounds);
         };
 
         let start = self.buffer.char_idx_line_start(cursor.y)? + cursor.x;
@@ -206,7 +202,7 @@ impl App {
             };
 
         match words.get(word_idx) {
-            None => Err(AppError::NoMoreWordsInLine),
+            None => Err(Error::NoMoreWordsInLine),
             Some(word) => {
                 let last_char =
                     word.first().expect("Chars array for next word is empty");
@@ -217,10 +213,10 @@ impl App {
         }
     }
 
-    pub fn move_next_word_end(&mut self, count: usize) -> AppResult<()> {
+    pub fn move_next_word_end(&mut self, count: usize) -> Result<()> {
         let cursor = self.buffer.cursor;
         if !self.buffer.in_visual_bounds(cursor.into()) {
-            return Err(AppError::CursorOutOfBounds);
+            return Err(Error::CursorOutOfBounds);
         };
 
         let start = self.buffer.char_idx_line_start(cursor.y)? + cursor.x;
@@ -235,11 +231,11 @@ impl App {
                     count - 1
                 }
             }
-            None => return Err(AppError::CursorOutOfBounds),
+            None => return Err(Error::CursorOutOfBounds),
         };
 
         match words.get(word_idx) {
-            None => Err(AppError::NoMoreWordsInLine),
+            None => Err(Error::NoMoreWordsInLine),
             Some(word) => {
                 let last_char =
                     word.last().expect("Chars array for next word is empty");
@@ -250,10 +246,10 @@ impl App {
         }
     }
 
-    pub fn move_next_long_word_end(&mut self, count: usize) -> AppResult<()> {
+    pub fn move_next_long_word_end(&mut self, count: usize) -> Result<()> {
         let cursor = self.buffer.cursor;
         if !self.buffer.in_visual_bounds(cursor.into()) {
-            return Err(AppError::CursorOutOfBounds);
+            return Err(Error::CursorOutOfBounds);
         };
 
         let start = self.buffer.char_idx_line_start(cursor.y)? + cursor.x;
@@ -268,11 +264,11 @@ impl App {
                     count - 1
                 }
             }
-            None => return Err(AppError::CursorOutOfBounds),
+            None => return Err(Error::CursorOutOfBounds),
         };
 
         match words.get(word_idx) {
-            None => Err(AppError::NoMoreWordsInLine),
+            None => Err(Error::NoMoreWordsInLine),
             Some(word) => {
                 let last_char =
                     word.last().expect("Chars array for next word is empty");
@@ -283,21 +279,21 @@ impl App {
         }
     }
 
-    pub fn move_prev_long_word_start(&mut self, count: usize) -> AppResult<()> {
+    pub fn move_prev_long_word_start(&mut self, count: usize) -> Result<()> {
         todo!()
     }
 
     /// Moves to the start of the prev word in the line.
-    pub fn move_prev_word_start(&mut self, count: usize) -> AppResult<()> {
+    pub fn move_prev_word_start(&mut self, count: usize) -> Result<()> {
         let cursor = self.buffer.cursor;
         if cursor.x == 0 {
-            return Err(AppError::NoMoreWordsInLine);
+            return Err(Error::NoMoreWordsInLine);
         }
 
         let on_empty_last_line = cursor.y == self.buffer.len_lines() - 1
             && self.buffer.line(cursor.y)?.chars().len() == 0;
         if on_empty_last_line {
-            return Err(AppError::NoMoreWordsInLine);
+            return Err(Error::NoMoreWordsInLine);
         }
 
         // Line is not empty.
@@ -310,7 +306,7 @@ impl App {
         words_in_line.reverse();
 
         match words_in_line.get(count - 1) {
-            None => Err(AppError::NoMoreWordsInLine),
+            None => Err(Error::NoMoreWordsInLine),
             Some(word) => {
                 let first_char =
                     word.first().expect("Chars array for prev word is empty");
@@ -322,23 +318,23 @@ impl App {
     }
 
     /// Move to the newline char on line. If it does't exist, error.
-    pub fn move_new_line_char(&mut self) -> AppResult<()> {
+    pub fn move_new_line_char(&mut self) -> Result<()> {
         todo!()
     }
 
     /// Move cursor to x=0. Also returns an error if the line has no chars or the cursor is already
     /// x = 0.
-    pub fn move_start_line(&mut self) -> AppResult<()> {
+    pub fn move_start_line(&mut self) -> Result<()> {
         let line_idx = self.buffer.cursor.y;
         let at_line_start = self.buffer.cursor.x == 0;
         self.buffer.cursor.x = 0;
 
         if self.buffer.line(line_idx)?.is_visually_empty() {
-            return Err(AppError::LineEmpty);
+            return Err(Error::LineEmpty);
         }
 
         if at_line_start {
-            return Err(AppError::AlreadyAtLineStart);
+            return Err(Error::AlreadyAtLineStart);
         };
 
         Ok(())
@@ -346,7 +342,7 @@ impl App {
 
     /// Move to the last char of the current + count line .
     /// If there are no chars, then move to x=0.
-    pub fn move_end_line(&mut self) -> AppResult<()> {
+    pub fn move_end_line(&mut self) -> Result<()> {
         let cursor = self.buffer.cursor;
         let on_last_line = self.buffer.cursor.y == self.buffer.len_lines() - 1;
         let curr_line = self.buffer.line(cursor.y)?;
@@ -359,12 +355,12 @@ impl App {
 
         if char_count == 0 {
             self.buffer.cursor.x = 0;
-            return Err(AppError::LineEmpty);
+            return Err(Error::LineEmpty);
         };
 
         let at_line_end = cursor.x == char_count - 1;
         if at_line_end {
-            return Err(AppError::AlreadyAtLineEnd);
+            return Err(Error::AlreadyAtLineEnd);
         }
 
         self.buffer.cursor.x = char_count - 1;
@@ -374,7 +370,7 @@ impl App {
 
 /// Soft errors that are displayed in the status line.
 #[derive(Debug)]
-pub enum AppError {
+pub enum Error {
     NoMoreLinesToDelete,
     CantMoveUp(
         usize, // Attempted distance.
@@ -400,20 +396,20 @@ pub enum AppError {
     CountRedundant,
 }
 
-impl From<BufferError> for AppError {
+impl From<buffer::Error> for Error {
     // do later
-    fn from(err: BufferError) -> Self {
+    fn from(err: buffer::Error) -> Self {
         match err {
-            BufferError::NoCharsInFile => AppError::NoCharsInFile,
-            BufferError::CursorOutOfBounds => AppError::CursorOutOfBounds,
-            _ => AppError::NoMoreLinesToDelete,
+            buffer::Error::NoCharsInFile => Error::NoCharsInFile,
+            buffer::Error::CursorOutOfBounds => Error::CursorOutOfBounds,
+            _ => Error::NoMoreLinesToDelete,
         }
     }
 }
 
-impl Error for AppError {}
+impl std::error::Error for Error {}
 
-impl Display for AppError {
+impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NoMoreLinesToDelete => write!(f, "No more lines to delete"),
@@ -446,9 +442,7 @@ impl Display for AppError {
     }
 }
 
-pub type AppResult<T> = std::result::Result<T, AppError>;
-
-pub type IoResult<T> = std::result::Result<T, Box<dyn error::Error>>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq)]
 pub enum Mode {
@@ -504,62 +498,62 @@ impl Display for Notification {
     }
 }
 
-impl From<&AppError> for Notification {
-    fn from(err: &AppError) -> Self {
+impl From<&Error> for Notification {
+    fn from(err: &Error) -> Self {
         match err {
-            AppError::NoMoreLinesToDelete => Self {
+            Error::NoMoreLinesToDelete => Self {
                 message_type: NotificationType::Warning,
                 text: "no lines to delete".into(),
             },
-            AppError::CantMoveUp(count, remaining) => Self {
+            Error::CantMoveUp(count, remaining) => Self {
                 message_type: NotificationType::Warning,
                 text: "already at top".into(),
             },
-            AppError::CantMoveDown(count, remaining) => Self {
+            Error::CantMoveDown(count, remaining) => Self {
                 message_type: NotificationType::Warning,
                 text: "already at bottom".into(),
             },
-            AppError::CantMoveLeft(count, remaining) => Self {
+            Error::CantMoveLeft(count, remaining) => Self {
                 message_type: NotificationType::Warning,
                 text: "already leftmost".into(),
             },
-            AppError::AlreadyAtStart => Self {
+            Error::AlreadyAtStart => Self {
                 message_type: NotificationType::Warning,
                 text: "already at file start".into(),
             },
-            AppError::AlreadyAtEnd => Self {
+            Error::AlreadyAtEnd => Self {
                 message_type: NotificationType::Warning,
                 text: "already at file end".into(),
             },
-            AppError::AlreadyAtLineStart => Self {
+            Error::AlreadyAtLineStart => Self {
                 message_type: NotificationType::Warning,
                 text: "already at line start".into(),
             },
-            AppError::AlreadyAtLineEnd => Self {
+            Error::AlreadyAtLineEnd => Self {
                 message_type: NotificationType::Warning,
                 text: "already at line end".into(),
             },
-            AppError::CursorOutOfBounds => Self {
+            Error::CursorOutOfBounds => Self {
                 message_type: NotificationType::Error,
                 text: "cursor out of bounds".into(),
             },
-            AppError::NoMoreWordsInLine => Self {
+            Error::NoMoreWordsInLine => Self {
                 message_type: NotificationType::Warning,
                 text: "no more words in line".into(),
             },
-            AppError::LineEmpty => Self {
+            Error::LineEmpty => Self {
                 message_type: NotificationType::Warning,
                 text: "no chars in line".into(),
             },
-            AppError::NoCharsInFile => Self {
+            Error::NoCharsInFile => Self {
                 message_type: NotificationType::Warning,
                 text: "no chars in file".into(),
             },
-            AppError::KeyUnmapped => Self {
+            Error::KeyUnmapped => Self {
                 message_type: NotificationType::Warning,
                 text: "key unmapped".into(),
             },
-            AppError::CountRedundant => Self {
+            Error::CountRedundant => Self {
                 message_type: NotificationType::Warning,
                 text: "count redundant".into(),
             },
