@@ -38,10 +38,10 @@ impl Buffer {
     pub fn line(&self, line_idx: usize) -> BufferResult<Line> {
         let in_bounds = line_idx < self.len_lines();
         if !in_bounds {
-            return Err(Error::LineIndexOutOfBounds(
-                line_idx,
-                self.len_lines(),
-            ));
+            return Err(Error::LineIndexOutOfBounds {
+                attempted_idx: line_idx,
+                len_lines: self.len_lines(),
+            });
         }
 
         Ok(self.rope.line(line_idx).into())
@@ -299,23 +299,23 @@ pub enum Error {
     NoCharsInFile,
     NoBytesInLine,
     CursorOutOfBounds,
-    CharRangeInvalid(
-        usize, // Start
-        usize, // End
-    ),
-    CharRangeOutOfBounds(
-        Option<usize>, // Start
-        Option<usize>, // End
-        usize,         // Rope char length
-    ),
-    InsertPointOutOfBounds(
-        usize, // Attempted index.
-        usize, // Actual char count.
-    ),
-    LineIndexOutOfBounds(
-        usize, // Attempted index.
-        usize, // Actual line length.
-    ),
+    CharRangeInvalid {
+        start: usize,
+        end: usize,
+    },
+    CharRangeOutOfBounds {
+        start: Option<usize>,
+        end: Option<usize>,
+        rope_char_len: usize,
+    },
+    InsertPointOutOfBounds {
+        attempted_idx: usize,
+        rope_char_count: usize,
+    },
+    LineIndexOutOfBounds {
+        attempted_idx: usize,
+        len_lines: usize,
+    },
 }
 
 impl std::error::Error for Error {}
@@ -333,26 +333,39 @@ impl Display for Error {
             Self::CursorOutOfBounds => {
                 write!(f, "cursor is out of bounds")
             }
-            Self::InsertPointOutOfBounds(attempted_idx, rope_len) => {
+            Self::InsertPointOutOfBounds {
+                attempted_idx,
+                rope_char_count,
+            } => {
                 write!(
                     f,
                     "Insert index {} out of bounds. {} chars in rope.",
-                    attempted_idx, rope_len
+                    attempted_idx, rope_char_count
                 )
             }
-            Self::CharRangeOutOfBounds(start_idx_opt, end_idx_opt, len) => {
+            Self::CharRangeOutOfBounds {
+                start: start_idx_opt,
+                end: end_idx_opt,
+                rope_char_len: len,
+            } => {
                 write!(f, "Char range out of bounds: char range ")?;
                 write_range(f, start_idx_opt, end_idx_opt)?;
                 write!(f, ", Rope/RopeSlice char length {}", len)
             }
-            Self::CharRangeInvalid(start_idx, end_idx) => {
+            Self::CharRangeInvalid {
+                start: start_idx,
+                end: end_idx,
+            } => {
                 write!(
                     f,
                     "Invalid char range {}..{}: start must be <= end",
                     start_idx, end_idx
                 )
             }
-            Self::LineIndexOutOfBounds(attempted_idx, rope_len) => {
+            Self::LineIndexOutOfBounds {
+                attempted_idx,
+                len_lines: rope_len,
+            } => {
                 write!(
                     f,
                     "Line index {} out of bounds. {} lines in rope.",
