@@ -1,5 +1,6 @@
 use crate::helpers::{
-    app_in_delete_mode, app_in_delete_mode_in_single_line_file, app_in_delete_mode_with_cursor_at_end_of_file, D_KEY, FIVE_KEY, ZERO_KEY
+    app_in_delete_mode, app_in_delete_mode_in_single_line_file,
+    app_in_delete_mode_with_cursor_at_end_of_file, D_KEY, FIVE_KEY, ZERO_KEY,
 };
 
 #[test]
@@ -89,7 +90,6 @@ fn five_key_then_d_key_should_not_move_cursor() {
 
 #[test]
 fn d_key_should_not_notify() {
-
     let (mut app, mut handler) = app_in_delete_mode_in_single_line_file();
 
     handler.handle_key_event(D_KEY, &mut app);
@@ -99,12 +99,14 @@ fn d_key_should_not_notify() {
 
 #[test]
 fn d_key_then_d_key_then_d_key_should_not_notify() {
-
     let (mut app, mut handler) = app_in_delete_mode_in_single_line_file();
 
     handler.handle_key_event(D_KEY, &mut app);
     handler.handle_key_event(D_KEY, &mut app);
     handler.handle_key_event(D_KEY, &mut app);
 
-    assert!(app.notifs().is_empty())
+    assert_eq!(
+        app.notifs().last().unwrap().to_string(),
+        "  no lines to delete"
+    )
 }

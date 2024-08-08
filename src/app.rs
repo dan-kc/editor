@@ -52,12 +52,13 @@ impl App {
     }
 
     pub fn delete_lines(&mut self, count: usize) -> Result<()> {
-        let line_idx = self.buffer.cursor.y;
-        let in_bound = line_idx + count <= self.buffer.len_lines();
         if count == 0 {
             return Ok(());
         }
-        if !in_bound {
+
+        let line_idx = self.buffer.cursor.y;
+        let in_bound = line_idx + count <= self.buffer.len_lines();
+        if !in_bound || self.buffer.is_empty() {
             return Err(Error::NoMoreLinesToDelete);
         };
 
