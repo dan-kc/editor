@@ -114,7 +114,7 @@ impl Handler {
             }
             KeyCode::Char('i') => {
                 self.key_events = vec![key_event];
-                let pos = app.buffer.cursor.into();
+                let pos: (usize, usize) = app.buffer.cursor.into();
                 if app.buffer.in_rope_bounds(pos)
                     || app.buffer.on_rope_tail(pos)
                 {
@@ -217,6 +217,12 @@ impl Handler {
             KeyCode::Char('d') => {
                 let count = self.count.take().unwrap_or(1);
                 app.delete_lines(count)?;
+                app.enter_mode(Mode::Normal);
+                self.reset_count();
+            }
+            KeyCode::Char('w') => {
+                let count = self.count.take().unwrap_or(1);
+                app.delete_to_next_word_start(count)?;
                 app.enter_mode(Mode::Normal);
                 self.reset_count();
             }

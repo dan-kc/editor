@@ -192,7 +192,7 @@ impl Buffer {
         let mut curr_chars = Vec::<Char>::new();
 
         for (char_idx, char) in chars.enumerate() {
-            let char = Char { char, char_idx };
+            let char = Char { char, distance: char_idx };
             let curr_type = char.classify();
             let prev_type = curr_chars.last().map(|char| char.classify());
 
@@ -244,10 +244,9 @@ impl Buffer {
         let chars = slice.chars();
         let mut words = Vec::<Word>::new();
         let mut curr_chars = Vec::new();
-        let mut last_char_idx = 0;
 
         for (char_idx, char) in chars.enumerate() {
-            let char = Char { char, char_idx };
+            let char = Char { char, distance: char_idx };
             if char.classify() != CharType::Whitespace {
                 curr_chars.push(char);
                 continue;
@@ -297,7 +296,6 @@ impl Buffer {
 #[derive(Debug)]
 pub enum Error {
     NoCharsInFile,
-    NoBytesInLine,
     CursorOutOfBounds,
     CharRangeInvalid {
         start: usize,
@@ -322,12 +320,10 @@ impl std::error::Error for Error {}
 
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Buffer error: ");
+        write!(f, "Buffer error: ")?;
+
         match *self {
             Self::NoCharsInFile => {
-                write!(f, "no bytes in line")
-            }
-            Self::NoBytesInLine => {
                 write!(f, "no bytes in line")
             }
             Self::CursorOutOfBounds => {
@@ -380,13 +376,7 @@ impl From<ropey::Error> for Error {
     fn from(err: ropey::Error) -> Self {
         match err {
             ropey::Error::CharRangeInvalid(start, end) => {
-                todo!()
-            }
-            ropey::Error::CharIndexOutOfBounds(start, end) => {
-                todo!()
-            }
-            ropey::Error::LineIndexOutOfBounds(start, end) => {
-                todo!()
+                Error::CharRangeInvalid { start, end }
             }
             _ => {
                 panic!("this is a rope error we have not accounted for")
@@ -410,7 +400,7 @@ type Word = Box<[Char]>;
 #[derive(Debug)]
 pub struct Char {
     pub char: char,
-    pub char_idx: usize,
+    pub distance: usize,
 }
 
 impl Char {
@@ -467,9 +457,9 @@ impl From<(usize, usize)> for Cursor {
     }
 }
 
-impl Into<(usize, usize)> for Cursor {
-    fn into(self) -> (usize, usize) {
-        (self.x, self.y)
+impl From<Cursor> for (usize, usize) {
+    fn from(cursor: Cursor) -> Self {
+        (cursor.x, cursor.y)
     }
 }
 
@@ -538,7 +528,7 @@ impl<'a> Line<'a> {
     pub fn chars(&self) -> Box<[char]> {
         let chars = self.slice.chars();
         let mut res = vec![];
-        for (char_idx, char) in chars.enumerate() {
+        for char in chars {
             res.push(char);
         }
         res.into_boxed_slice()

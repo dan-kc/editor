@@ -1,6 +1,7 @@
 use crate::helpers::{
-    app_in_delete_mode, app_in_delete_mode_in_single_line_file,
-    app_in_delete_mode_with_cursor_at_end_of_file, D_KEY, FIVE_KEY, ZERO_KEY,
+    app_default, app_in_delete_mode, app_in_delete_mode_in_single_line_file,
+    app_in_delete_mode_with_cursor_at_end_of_file, DOWN_KEY, D_KEY, FIVE_KEY,
+    FOUR_KEY, THREE_KEY, ZERO_KEY,
 };
 
 #[test]
@@ -22,6 +23,16 @@ fn d_key_should_not_move_cursor() {
     handler.handle_key_event(D_KEY, &mut app);
 
     assert_eq!(app.buffer.cursor, (0, 0).into())
+}
+
+#[test]
+fn d_key_on_last_line_should_move_cursor() {
+    let (mut app, mut handler) =
+        app_in_delete_mode_with_cursor_at_end_of_file();
+
+    handler.handle_key_event(D_KEY, &mut app);
+
+    assert_eq!(app.buffer.cursor, (9, 5).into())
 }
 
 #[test]
@@ -109,4 +120,21 @@ fn d_key_then_d_key_then_d_key_should_not_notify() {
         app.notifs().last().unwrap().to_string(),
         "  no lines to delete"
     )
+}
+
+#[test]
+fn subsequent_deletes() {
+    let (mut app, mut handler) = app_default();
+
+    handler.handle_key_event(THREE_KEY, &mut app);
+    handler.handle_key_event(DOWN_KEY, &mut app);
+
+    handler.handle_key_event(D_KEY, &mut app);
+    handler.handle_key_event(FOUR_KEY, &mut app);
+    handler.handle_key_event(D_KEY, &mut app);
+    dbg!(app.buffer.cursor);
+
+    handler.handle_key_event(D_KEY, &mut app);
+    handler.handle_key_event(D_KEY, &mut app);
+    assert_eq!(app.buffer.cursor, (0, 1).into())
 }

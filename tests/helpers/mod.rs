@@ -131,6 +131,12 @@ pub fn app_in_delete_mode() -> (app::App, handler::Handler) {
     AppBuilder::new_default().press_key(D_KEY).build()
 }
 
+pub fn app_in_delete_mode_on_last_line() -> (app::App, handler::Handler) {
+    AppBuilder::new_default().press_key(CAP_G_KEY).build();
+
+    AppBuilder::new_default().press_key(D_KEY).build()
+}
+
 pub fn app_in_insert_mode() -> (app::App, handler::Handler) {
     AppBuilder::new_default().press_key(I_KEY).build()
 }
@@ -171,6 +177,8 @@ pub const ZERO_KEY: KeyEvent =
     KeyEvent::new(KeyCode::Char('0'), KeyModifiers::NONE);
 pub const THREE_KEY: KeyEvent =
     KeyEvent::new(KeyCode::Char('3'), KeyModifiers::NONE);
+pub const FOUR_KEY: KeyEvent =
+    KeyEvent::new(KeyCode::Char('4'), KeyModifiers::NONE);
 pub const FIVE_KEY: KeyEvent =
     KeyEvent::new(KeyCode::Char('5'), KeyModifiers::NONE);
 pub const I_KEY: KeyEvent =
