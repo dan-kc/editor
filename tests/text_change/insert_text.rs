@@ -34,9 +34,5 @@ fn a_key_in_empty_file_should_insert_text_to_buffer() {
 
     handler.handle_key_event(A_KEY, &mut app);
 
-    assert_eq!(
-        app.buffer.line(0).unwrap().to_string(),
-        "a"
-    );
+    assert_eq!(app.buffer.line(0).unwrap().to_string(), "a");
 }
-

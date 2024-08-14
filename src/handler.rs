@@ -76,27 +76,57 @@ impl Handler {
             }
             KeyCode::Char('w') => {
                 let count = self.count.take().unwrap_or(1);
-                app.move_next_word_start(count)?
+                app.move_word(
+                    count,
+                    app::Direction::Forward,
+                    app::Length::Short,
+                    app::Boundary::Start,
+                )?
             }
             KeyCode::Char('W') => {
                 let count = self.count.take().unwrap_or(1);
-                app.move_next_long_word_start(count)?
+                app.move_word(
+                    count,
+                    app::Direction::Forward,
+                    app::Length::Long,
+                    app::Boundary::Start,
+                )?
             }
             KeyCode::Char('e') => {
                 let count = self.count.take().unwrap_or(1);
-                app.move_next_word_end(count)?
+                app.move_word(
+                    count,
+                    app::Direction::Forward,
+                    app::Length::Short,
+                    app::Boundary::End,
+                )?
             }
             KeyCode::Char('E') => {
                 let count = self.count.take().unwrap_or(1);
-                app.move_next_long_word_end(count)?
+                app.move_word(
+                    count,
+                    app::Direction::Forward,
+                    app::Length::Long,
+                    app::Boundary::End,
+                )?
             }
             KeyCode::Char('b') => {
                 let count = self.count.take().unwrap_or(1);
-                app.move_prev_word_start(count)?
+                app.move_word(
+                    count,
+                    app::Direction::Backward,
+                    app::Length::Short,
+                    app::Boundary::Start,
+                )?
             }
             KeyCode::Char('B') => {
                 let count = self.count.take().unwrap_or(1);
-                app.move_prev_long_word_start(count)?
+                app.move_word(
+                    count,
+                    app::Direction::Backward,
+                    app::Length::Long,
+                    app::Boundary::Start,
+                )?
             }
             KeyCode::Home => {
                 let count = self.count.take();
@@ -189,7 +219,7 @@ impl Handler {
 
     /// Count will be zero and keys will be 'g' when insert mode is entered.
     fn handle_go_to_mode_key_event(
-        &self,
+        &mut self,
         key_event: KeyEvent,
         app: &mut App,
     ) -> app::Result<()> {
@@ -200,6 +230,28 @@ impl Handler {
             }
             KeyCode::Esc => {
                 app.enter_mode(Mode::Normal);
+            }
+            KeyCode::Char('e') => {
+                let count = self.count.take().unwrap_or(1);
+
+                app.enter_mode(Mode::Normal);
+                app.move_word(
+                    count,
+                    app::Direction::Backward,
+                    app::Length::Short,
+                    app::Boundary::Start,
+                )?;
+            }
+            KeyCode::Char('E') => {
+                let count = self.count.take().unwrap_or(1);
+
+                app.enter_mode(Mode::Normal);
+                app.move_word(
+                    count,
+                    app::Direction::Backward,
+                    app::Length::Short,
+                    app::Boundary::End,
+                )?;
             }
             _ => return Err(app::Error::KeyUnmapped),
         };
@@ -222,7 +274,49 @@ impl Handler {
             }
             KeyCode::Char('w') => {
                 let count = self.count.take().unwrap_or(1);
-                app.delete_to_next_word_start(count)?;
+
+                app.delete_word(
+                    count,
+                    app::Direction::Forward,
+                    app::Length::Short,
+                    app::Boundary::Start,
+                )?;
+                app.enter_mode(Mode::Normal);
+                self.reset_count();
+            }
+            KeyCode::Char('W') => {
+                let count = self.count.take().unwrap_or(1);
+
+                app.delete_word(
+                    count,
+                    app::Direction::Forward,
+                    app::Length::Long,
+                    app::Boundary::Start,
+                )?;
+                app.enter_mode(Mode::Normal);
+                self.reset_count();
+            }
+            KeyCode::Char('e') => {
+                let count = self.count.take().unwrap_or(1);
+
+                app.delete_word(
+                    count,
+                    app::Direction::Forward,
+                    app::Length::Short,
+                    app::Boundary::End,
+                )?;
+                app.enter_mode(Mode::Normal);
+                self.reset_count();
+            }
+            KeyCode::Char('E') => {
+                let count = self.count.take().unwrap_or(1);
+
+                app.delete_word(
+                    count,
+                    app::Direction::Forward,
+                    app::Length::Long,
+                    app::Boundary::End,
+                )?;
                 app.enter_mode(Mode::Normal);
                 self.reset_count();
             }

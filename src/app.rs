@@ -177,6 +177,7 @@ impl App {
         if !self.buffer.in_visual_bounds(cursor.into()) {
             return Err(Error::CursorOutOfBounds);
         }
+
         Ok(())
     }
 
@@ -188,13 +189,11 @@ impl App {
         length: Length,
         boundary: Boundary,
     ) -> Result<usize> {
-        self.ensure_cursor_in_visual_bounds()?;
-
         let cursor = self.buffer.cursor;
         let start = self.buffer.char_idx_under_pos(cursor.into())?;
 
         match (direction, length, boundary) {
-            (Forward, Short, Front) => {
+            (Direction::Forward, Length::Short, Boundary::Start) => {
                 let end = self.buffer.char_idx_line_end(cursor.y)?;
 
                 let is_whitespace =
@@ -207,216 +206,152 @@ impl App {
                     .map(|word| word.first().unwrap().distance)
                     .ok_or(Error::NoMoreWordsInLine)
             }
-            (Forward, Short, End) => {
+            (Direction::Forward, Length::Short, Boundary::End) => {
+                self.ensure_cursor_in_visual_bounds()?;
+
+                let end = self.buffer.char_idx_line_end(cursor.y)?;
+                let words = self.buffer.words(start..=end)?;
+                let word_idx = words
+                    .first()
+                    .map(|word| if word.len() == 1 { count } else { count - 1 })
+                    .ok_or(Error::CursorOutOfBounds)?;
+
+                words
+                    .get(word_idx)
+                    .map(|word| word.last().unwrap().distance)
+                    .ok_or(Error::NoMoreWordsInLine)
+            }
+            (Direction::Forward, Length::Long, Boundary::Start) => {
+                let end = self.buffer.char_idx_line_end(cursor.y)?;
+                let is_whitespace =
+                    self.buffer.char_under_pos(cursor.into())?.is_whitespace();
+                let word_idx = if is_whitespace { count - 1 } else { count };
+
+                self.buffer
+                    .words_long(start..=end)?
+                    .get(word_idx)
+                    .map(|word| word.first().unwrap().distance)
+                    .ok_or(Error::NoMoreWordsInLine)
+            }
+            (Direction::Forward, Length::Long, Boundary::End) => {
+                self.ensure_cursor_in_visual_bounds()?;
+
+                let end = self.buffer.char_idx_line_end(cursor.y)?;
+                let words = self.buffer.words_long(start..=end)?;
+                let word_idx = words
+                    .first()
+                    .map(|word| if word.len() == 1 { count } else { count - 1 })
+                    .ok_or(Error::CursorOutOfBounds)?;
+
+                words
+                    .get(word_idx)
+                    .map(|word| word.last().unwrap().distance)
+                    .ok_or(Error::NoMoreWordsInLine)
+            }
+            (Direction::Backward, Length::Short, Boundary::Start) => {
+                if cursor.x == 0 {
+                    return Err(Error::NoMoreWordsInLine);
+                }
+
+                // if out of bounds {
+                // if line_empty() {
+                // retrun 0
+                // }
+                // return END_OF_LINE - 1
+                // }
+
+                let on_empty_last_line = cursor.y
+                    == self.buffer.len_lines() - 1
+                    && self.buffer.line(cursor.y)?.chars().len() == 0;
+                if on_empty_last_line {
+                    return Err(Error::NoMoreWordsInLine);
+                }
+
+                // Line is not empty.
+                let start = self.buffer.char_idx_line_start(cursor.y)?;
+                let end = std::cmp::min(
+                    self.buffer.char_idx_line_start(cursor.y)? + cursor.x - 1, // the char before
+                    self.buffer.char_idx_line_end(cursor.y)?,
+                );
+
+                let mut words_in_line = self.buffer.words(start..=end)?;
+                words_in_line.reverse();
+
+                let char_idx_from_start = words_in_line
+                    .get(count - 1)
+                    .map(|word| word.first().unwrap().distance)
+                    .ok_or(Error::NoMoreWordsInLine);
+
+                Ok(cursor.x - char_idx_from_start?)
+            }
+            (Direction::Backward, Length::Short, Boundary::End) => {
                 todo!()
             }
-            (Forward, Long, Front) => {
+            (Direction::Backward, Length::Long, Boundary::Start) => {
                 todo!()
             }
-            (Forward, Long, End) => {
-                todo!()
-            }
-            (Backward, Short, Front) => {
-                todo!()
-            }
-            (Backward, Short, End) => {
-                todo!()
-            }
-            (Backward, Long, Front) => {
-                todo!()
-            }
-            (Backward, Long, End) => {
+            (Direction::Backward, Length::Long, Boundary::End) => {
                 todo!()
             }
         }
-    }
-
-    fn next_word_distance(&mut self, count: usize) -> Result<usize> {
-        self.ensure_cursor_in_visual_bounds()?;
-
-        let cursor = self.buffer.cursor;
-        let start = self.buffer.char_idx_under_pos(cursor.into())?;
-        let end = self.buffer.char_idx_line_end(cursor.y)?;
-
-        let is_whitespace =
-            self.buffer.char_under_pos(cursor.into())?.is_whitespace();
-        let word_idx = if is_whitespace { count - 1 } else { count };
-
-        self.buffer
-            .words(start..=end)?
-            .get(word_idx)
-            .map(|word| word.first().unwrap().distance)
-            .ok_or(Error::NoMoreWordsInLine)
-    }
-
-    fn next_long_word_distance(&mut self, count: usize) -> Result<usize> {
-        self.ensure_cursor_in_visual_bounds()?;
-
-        let cursor = self.buffer.cursor;
-        let start = self.buffer.char_idx_under_pos(cursor.into())?;
-        let end = self.buffer.char_idx_line_end(cursor.y)?;
-
-        let is_whitespace =
-            self.buffer.char_under_pos(cursor.into())?.is_whitespace();
-        let word_idx = if is_whitespace { count - 1 } else { count };
-
-        self.buffer
-            .words_long(start..=end)?
-            .get(word_idx)
-            .map(|word| word.first().unwrap().distance)
-            .ok_or(Error::NoMoreWordsInLine)
-    }
-
-    fn next_word_end_distance(&mut self, count: usize) -> Result<usize> {
-        self.ensure_cursor_in_visual_bounds()?;
-
-        let cursor = self.buffer.cursor;
-        let start = self.buffer.char_idx_under_pos(cursor.into())?;
-        let end = self.buffer.char_idx_line_end(cursor.y)?;
-
-        let words = self.buffer.words(start..=end)?;
-        let word_idx = words
-            .first()
-            .map(|word| if word.len() == 1 { count } else { count - 1 })
-            .ok_or(Error::CursorOutOfBounds)?;
-
-        words
-            .get(word_idx)
-            .map(|word| word.last().unwrap().distance)
-            .ok_or(Error::NoMoreWordsInLine)
-    }
-
-    fn next_long_word_end_distance(&mut self, count: usize) -> Result<usize> {
-        self.ensure_cursor_in_visual_bounds()?;
-
-        let cursor = self.buffer.cursor;
-        let start = self.buffer.char_idx_under_pos(cursor.into())?;
-        let end = self.buffer.char_idx_line_end(cursor.y)?;
-
-        let words = self.buffer.words_long(start..=end)?;
-        let word_idx = words
-            .first()
-            .map(|word| if word.len() == 1 { count } else { count - 1 })
-            .ok_or(Error::CursorOutOfBounds)?;
-
-        words
-            .get(word_idx)
-            .map(|word| word.last().unwrap().distance)
-            .ok_or(Error::NoMoreWordsInLine)
-    }
-
-    fn prev_long_word_distance(&mut self, count: usize) -> Result<usize> {
-        todo!()
-    }
-
-    fn prev_word_distance(&mut self, count: usize) -> Result<usize> {
-        self.ensure_cursor_in_visual_bounds()?;
-
-        let cursor = self.buffer.cursor;
-        let on_empty_last_line = cursor.y == self.buffer.len_lines() - 1
-            && self.buffer.line(cursor.y)?.chars().len() == 0;
-        if on_empty_last_line {
-            return Err(Error::NoMoreWordsInLine);
-        }
-
-        // Line is not empty.
-        let start = self.buffer.char_idx_line_start(cursor.y)?;
-        let end = std::cmp::min(
-            self.buffer.char_idx_under_pos(cursor.into())? - 1, // the char before
-            self.buffer.char_idx_line_end(cursor.y)?,
-        );
-
-        let mut words_in_line = self.buffer.words(start..=end)?;
-        words_in_line.reverse();
-
-        words_in_line
-            .get(count - 1)
-            .map(|word| word.first().unwrap().distance)
-            .ok_or(Error::NoMoreWordsInLine)
-    }
-
-    fn prev_word_end_distance(&mut self, count: usize) -> Result<usize> {
-        todo!()
-    }
-
-    fn prev_long_word_end_distance(&mut self, count: usize) -> Result<usize> {
-        todo!()
     }
 
     /// Moves to the start of the next word in the line.
-    pub fn move_next_word_start(&mut self, count: usize) -> Result<()> {
-        self.buffer.cursor.x += self.next_word_distance(count)?;
+    pub fn move_word(
+        &mut self,
+        count: usize,
+        direction: Direction,
+        length: Length,
+        boundary: Boundary,
+    ) -> Result<()> {
+        match direction {
+            Direction::Forward => {
+                self.buffer.cursor.x +=
+                    self.word_distance(count, direction, length, boundary)?
+            }
+            Direction::Backward => {
+                let distance =
+                    self.word_distance(count, direction, length, boundary)?;
+                if self.buffer.cursor.x < distance {
+                    return Err(Error::NoMoreWordsInLine);
+                }
+                self.buffer.cursor.x -= distance
+            }
+        };
 
         Ok(())
     }
 
-    /// Delete to the start of the next word in the line.
-    pub fn delete_to_next_word_start(&mut self, count: usize) -> Result<()> {
-        let curr_char_idx =
-            self.buffer.char_idx_under_pos(self.buffer.cursor.into())?;
-        let end_char_idx = self.next_word_distance(count)? + curr_char_idx;
+    pub fn delete_word(
+        &mut self,
+        count: usize,
+        direction: Direction,
+        length: Length,
+        boundary: Boundary,
+    ) -> Result<()> {
+        match direction {
+            Direction::Forward => {
+                let start_char_idx = self
+                    .buffer
+                    .char_idx_under_pos(self.buffer.cursor.into())?;
+                let end_char_idx = self
+                    .word_distance(count, direction, length, boundary)?
+                    + start_char_idx;
 
-        self.buffer.remove(curr_char_idx..=end_char_idx)?;
+                self.buffer.remove(start_char_idx..=end_char_idx)?;
+            }
+            Direction::Backward => {
+                let end_char_idx = self
+                    .buffer
+                    .char_idx_under_pos(self.buffer.cursor.into())?;
+                let start_char_idx = end_char_idx
+                    - self.word_distance(count, direction, length, boundary)?;
 
-        Ok(())
-    }
-
-    pub fn move_next_long_word_start(&mut self, count: usize) -> Result<()> {
-        self.buffer.cursor.x += self.next_long_word_distance(count)?;
-
-        Ok(())
-    }
-
-    pub fn move_next_word_end(&mut self, count: usize) -> Result<()> {
-        self.buffer.cursor.x += self.next_word_end_distance(count)?;
-
-        Ok(())
-    }
-
-    pub fn move_next_long_word_end(&mut self, count: usize) -> Result<()> {
-        self.buffer.cursor.x += self.next_long_word_end_distance(count)?;
-
-        Ok(())
-    }
-
-    pub fn move_prev_long_word_start(&mut self, count: usize) -> Result<()> {
-        self.buffer.cursor.x -= self.prev_long_word_end_distance(count)?;
-
-        Ok(())
-    }
-
-    /// Moves to the start of the prev word in the line.
-    pub fn move_prev_word_start(&mut self, count: usize) -> Result<()> {
-        let cursor = self.buffer.cursor;
-        if cursor.x == 0 {
-            return Err(Error::NoMoreWordsInLine);
-        }
-
-        let on_empty_last_line = cursor.y == self.buffer.len_lines() - 1
-            && self.buffer.line(cursor.y)?.chars().len() == 0;
-        if on_empty_last_line {
-            return Err(Error::NoMoreWordsInLine);
-        }
-
-        // Line is not empty.
-        let start = self.buffer.char_idx_line_start(cursor.y)?;
-        let end = std::cmp::min(
-            self.buffer.char_idx_line_start(cursor.y)? + cursor.x - 1, // the char before
-            self.buffer.char_idx_line_end(cursor.y)?,
-        );
-        let mut words_in_line = self.buffer.words(start..=end)?;
-        words_in_line.reverse();
-
-        match words_in_line.get(count - 1) {
-            None => Err(Error::NoMoreWordsInLine),
-            Some(word) => {
-                let first_char =
-                    word.first().expect("Chars array for prev word is empty");
-                self.buffer.cursor.x = first_char.distance;
-
-                Ok(())
+                self.buffer.remove(start_char_idx..=end_char_idx)?;
             }
         }
+
+        Ok(())
     }
 
     /// Move to the newline char on line. If it does't exist, error.
@@ -672,17 +607,18 @@ pub enum NotificationType {
     Success,
 }
 
-enum Direction {
+#[derive(Copy, Clone)]
+pub enum Direction {
     Forward,
     Backward,
 }
 
-enum Boundary {
-    Front,
+pub enum Boundary {
+    Start,
     End,
 }
 
-enum Length {
+pub enum Length {
     Long,
     Short,
 }

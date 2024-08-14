@@ -6,7 +6,7 @@ use editor::{
 };
 
 #[derive(Default)]
-enum MockFile {
+pub enum MockFile {
     #[default]
     Basic,
     Empty,
@@ -28,7 +28,7 @@ fn init_app(file: MockFile) -> (app::App, handler::Handler) {
     (app::App::new(buffer), handler::Handler::new())
 }
 
-struct AppBuilder {
+pub struct AppBuilder {
     mock_file: MockFile,
     keys: Vec<KeyEvent>,
 }
@@ -71,6 +71,14 @@ pub fn app_default() -> (app::App, handler::Handler) {
 pub fn app_with_cursor_on_end_of_first_line() -> (app::App, handler::Handler) {
     AppBuilder::new_default().press_key(END_KEY).build()
 }
+pub fn app_with_cursor_near_end_of_first_line() -> (app::App, handler::Handler)
+{
+    AppBuilder::new_default()
+        .press_key(END_KEY)
+        .press_key(THREE_KEY)
+        .press_key(LEFT_KEY)
+        .build()
+}
 
 pub fn app_with_cursor_on_start_of_last_line() -> (app::App, handler::Handler) {
     AppBuilder::new_default()
@@ -100,11 +108,25 @@ pub fn app_with_cursor_on_newline_char() -> (app::App, handler::Handler) {
         .build()
 }
 
+pub fn app_with_cursor_on_empty_line() -> (app::App, handler::Handler) {
+    AppBuilder::new_default()
+        .press_key(DOWN_KEY)
+        .press_key(DOWN_KEY)
+        .build()
+}
+
 pub fn app_with_cursor_out_of_rope_bounds() -> (app::App, handler::Handler) {
     AppBuilder::new_default()
         .press_key(END_KEY)
         .press_key(RIGHT_KEY)
         .press_key(RIGHT_KEY)
+        .build()
+}
+
+pub fn app_with_cursor_on_indented_line() -> (app::App, handler::Handler) {
+    AppBuilder::new_default()
+        .press_key(FIVE_KEY)
+        .press_key(DOWN_KEY)
         .build()
 }
 
@@ -157,6 +179,10 @@ pub fn app_in_insert_mode_with_cursor_on_newline_char(
 }
 
 pub fn app_in_goto_mode() -> (app::App, handler::Handler) {
+    AppBuilder::new_default().press_key(G_KEY).build()
+}
+
+pub fn app_in_goto_mode_on_newline_char() -> (app::App, handler::Handler) {
     AppBuilder::new_default().press_key(G_KEY).build()
 }
 

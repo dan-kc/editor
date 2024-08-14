@@ -44,7 +44,7 @@ fn five_key_then_d_key_should_delete_lines() {
 
     assert_eq!(
         app.buffer.line(0).unwrap().to_string(),
-        "sed tem8us soll+citudin.\n"
+        "  d tem8us soll+citudin.\n"
     )
 }
 
