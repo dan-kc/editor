@@ -274,6 +274,7 @@ impl Handler {
             }
             KeyCode::Char('w') => {
                 let count = self.count.take().unwrap_or(1);
+                app.enter_mode(Mode::Normal);
 
                 app.delete_word(
                     count,
@@ -281,11 +282,11 @@ impl Handler {
                     app::Length::Short,
                     app::Boundary::Start,
                 )?;
-                app.enter_mode(Mode::Normal);
                 self.reset_count();
             }
             KeyCode::Char('W') => {
                 let count = self.count.take().unwrap_or(1);
+                app.enter_mode(Mode::Normal);
 
                 app.delete_word(
                     count,
@@ -293,11 +294,11 @@ impl Handler {
                     app::Length::Long,
                     app::Boundary::Start,
                 )?;
-                app.enter_mode(Mode::Normal);
                 self.reset_count();
             }
             KeyCode::Char('e') => {
                 let count = self.count.take().unwrap_or(1);
+                app.enter_mode(Mode::Normal);
 
                 app.delete_word(
                     count,
@@ -305,11 +306,11 @@ impl Handler {
                     app::Length::Short,
                     app::Boundary::End,
                 )?;
-                app.enter_mode(Mode::Normal);
                 self.reset_count();
             }
             KeyCode::Char('E') => {
                 let count = self.count.take().unwrap_or(1);
+                app.enter_mode(Mode::Normal);
 
                 app.delete_word(
                     count,
@@ -317,7 +318,6 @@ impl Handler {
                     app::Length::Long,
                     app::Boundary::End,
                 )?;
-                app.enter_mode(Mode::Normal);
                 self.reset_count();
             }
             KeyCode::Char(numb) if numb.is_ascii_digit() => {
